@@ -94,6 +94,92 @@ function App() {
 wuira.Mount(App);
 ```
 
+### Group members
+
+```ts
+import { GroupMembers, PartyMembers, RaidMembers, Buffs } from "wuira/datasources";
+
+const group = new GroupMembers();
+for (const unit of group.Value) {
+    const buffs = new Buffs(unit);
+    // Apply your own buff-tracking rules to buffs.Value when readable.
+}
+
+const party = new PartyMembers();
+const raid = new RaidMembers();
+```
+
+`GroupMembers` returns `["player"]` while solo, `player` plus `partyN` tokens
+in a party, and `raidN` tokens in a raid. `PartyMembers` is empty outside a
+party; `RaidMembers` is empty outside a raid. The player is included once.
+Offline members are retained. Each `.Value` access reads the current roster;
+there is no automatic subscription, polling, or UI rerender. Read again when
+handling `GROUP_ROSTER_UPDATE`. Tokens may refer to different members after
+roster changes and should not be used as persistent identities.
+
+### Player class and specialization
+
+```ts
+import { UnitSource, ClassSource, SpecSource, Unit } from "wuira/datasources";
+
+const target = new UnitSource(Unit.Target);
+const playerClass = new ClassSource(target);
+const specs = new SpecSource(target);
+
+console.log(target.Is.PC); // boolean | undefined when restricted
+console.log(playerClass.Value?.token);
+specs.RequestInspect();
+// Later, after INSPECT_READY: specs.Value contains native specialization data.
+// Each entry exposes id, name, icon, role, and pointsSpent when provided.
+// Call specs.Dispose() when the owning feature is removed or cancels the request.
+```
+
+These sources accept real players only; NPCs produce no data or inspect request.
+The same `UnitSource` can be passed to `Buffs`, `Debuffs`, `HP`, and `Mana`.
+Its `Value` contains the current token and GUID, rather than a cached identity.
+`Is.PC` and `Is.Self` return `undefined` when their native result is secret.
+String unit tokens are still supported as a convenience shorthand.
+Own specialization data is read directly. Other players require an explicit,
+out-of-combat inspect request and a matching response GUID. An unknown result
+remains `undefined`, and a changed unit token cannot expose another player's
+cached result. Secret values are guarded by the datasource API. Requests are
+not globally queued or automatically retried; callers own cancellation and
+request timing. Inspect permission, range, hostile-player support, and the
+meaning of talent-point fields must be verified on Forever. Being a player
+does not by itself guarantee inspect access.
+
+### Aura ownership
+
+Buff and debuff sources expose fresh snapshots with caster information. Application
+code decides which blessings or other effects should be displayed.
+
+```ts
+import { Buffs, Debuffs, Unit } from "wuira/datasources";
+
+const buffs = new Buffs(Unit.Target);
+const debuffs = new Debuffs(Unit.Target);
+
+buffs.Compute(auras => {
+    for (const aura of auras) {
+        if (aura.isSourceSelf() === true) {
+            console.log(aura.name, "applied by me");
+        } else if (aura.isSourceSelf() === false) {
+            console.log(aura.name, "applied by", aura.sourceUnit);
+        }
+        // undefined means ownership is unknown, not that another player cast it.
+    }
+});
+```
+
+`sourceStatus` is `known`, `unknown`, or `restricted`. Restricted caster values
+are not exposed. Secret spell/name/icon data blocks `.Value` and `.Compute` through
+the normal datasource guard; `.IsSecret()` reports it. Missing native API support
+raises an explicit error instead of returning an apparently empty list. Reads do
+not install event listeners or poll automatically. The current adapter requires
+`C_UnitAuras.GetAuraDataByIndex`; Forever availability and restrictions still need
+in-game verification. Unit tokens refer to snapshot time and are not persistent
+caster identities. No Paladin-specific spell catalog or filtering is built in.
+
 ### Visual styling
 
 <!-- Screenshot: a dark Cell with a thin colored border. -->
@@ -239,6 +325,9 @@ Cell is the basic visual box. FlowLayout and GridLayout arrange children. Progre
 Licensed under MIT; see [LICENSE](LICENSE).
 
 ## Releases
+
+See [CHANGELOG.md](CHANGELOG.md) for release history. Record new changes under
+`Unreleased`, then move them into a dated version section before publishing.
 
 The first version is published. To publish the next version locally, validate the project, increment the patch version, and publish:
 

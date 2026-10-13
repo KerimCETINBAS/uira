@@ -1,3 +1,11 @@
 export { DataSource } from "./DataSource";
 export { ProgressSource } from "./ProgressSource";
 export { HP, Mana, Unit, DataSources } from "./Resources";
+export { Aura, AuraSource, Buffs, Debuffs } from "./Auras";
+export type { AuraSourceStatus } from "./Auras";
+export { GroupMembers, PartyMembers, RaidMembers } from "./GroupMembers";
+export type { GroupScope } from "./GroupMembers";
+export { ClassSource, SpecSource, Specializations } from "./UnitInfo";
+export type { ClassInfo, SpecializationInfo, InspectStatus } from "./UnitInfo";
+export { UnitSource } from "./UnitSource";
+export type { UnitInput, UnitIdentity } from "./UnitSource";

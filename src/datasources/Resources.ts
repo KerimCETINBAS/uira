@@ -1,6 +1,8 @@
 import { ProgressSource } from "./ProgressSource";
+import { UnitSource, resolveUnit } from "./UnitSource";
+import type { UnitInput } from "./UnitSource";
 
-export const Unit = { Player: "player" } as const;
+export { Unit } from "./UnitSource";
 
 /** Direct API-to-widget binding; opaque values are never compared or calculated. */
 abstract class Resource extends ProgressSource {
@@ -24,17 +26,25 @@ abstract class Resource extends ProgressSource {
 }
 
 export class HP extends Resource {
-    public constructor(public readonly unit: string) {
-        super(() => UnitHealth(unit), () => UnitHealthMax(unit),
-            () => UnitHealthPercent(unit, true, CurveConstants.ScaleTo100), unit, ["UNIT_HEALTH", "UNIT_MAXHEALTH"]);
+    public readonly target: UnitSource;
+    public get unit(): string { return this.target.Token; }
+    public constructor(unit: UnitInput) {
+        const target = resolveUnit(unit);
+        super(() => UnitHealth(target.Token), () => UnitHealthMax(target.Token),
+            () => UnitHealthPercent(target.Token, true, CurveConstants.ScaleTo100), target.Token, ["UNIT_HEALTH", "UNIT_MAXHEALTH"]);
+        this.target = target;
     }
 }
 
 /** Explicit mana (power type 0), even while the unit uses rage/energy. */
 export class Mana extends Resource {
-    public constructor(public readonly unit: string) {
-        super(() => UnitPower(unit, 0), () => UnitPowerMax(unit, 0),
-            () => UnitPowerPercent(unit, 0, true, CurveConstants.ScaleTo100), unit, ["UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER"]);
+    public readonly target: UnitSource;
+    public get unit(): string { return this.target.Token; }
+    public constructor(unit: UnitInput) {
+        const target = resolveUnit(unit);
+        super(() => UnitPower(target.Token, 0), () => UnitPowerMax(target.Token, 0),
+            () => UnitPowerPercent(target.Token, 0, true, CurveConstants.ScaleTo100), target.Token, ["UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER"]);
+        this.target = target;
     }
 }
 

@@ -305,6 +305,113 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(#frames == first+1 and #suppressedFrame.textures == 0)
       API.Unmount(nil,suppressedFrame)
       print("wuira_CELL_OK")
+      local auraAPI = __wuiraModules.require("datasources.Auras")
+      local helpful = {
+        {spellId=1,name="Wisdom",icon=10,sourceUnit="party1"},
+        {spellId=2,name="Might",icon=20,sourceUnit="player"},
+        {spellId=3,name="Unknown",icon=30},
+        {spellId=4,name="Restricted caster",icon=40,sourceUnit={secret=true}},
+      }
+      local harmful = {{spellId=5,name="Poison",icon=50,sourceUnit="target"}}
+      function UnitIsUnit(first,second) return first == second or first == "raid2" end
+      C_UnitAuras = {GetAuraDataByIndex=function(unit,index,filter)
+        assert(unit == "target")
+        if filter == "HELPFUL" then return helpful[index] end
+        assert(filter == "HARMFUL")
+        return harmful[index]
+      end}
+      local buffs = new(auraAPI.Buffs,"target")
+      local debuffs = new(auraAPI.Debuffs,"target")
+      local list = buffs.Value
+      assert(#list == 4 and list[1].sourceUnit == "party1" and list[1]:isSourceSelf() == false)
+      assert(list[2]:isSourceSelf() == true)
+      assert(list[3].sourceStatus == "unknown" and list[3]:isSourceSelf() == nil)
+      assert(list[4].sourceStatus == "restricted" and list[4].sourceUnit == nil and list[4]:isSourceSelf() == nil)
+      assert(debuffs.Value[1].spellId == 5)
+      helpful[2].sourceUnit = "raid2"
+      assert(buffs.Value[2]:isSourceSelf() == true)
+      helpful[1].spellId = {secret=true}
+      assert(buffs:IsSecret() and not pcall(function() return buffs.Value end))
+      helpful = {}
+      assert(not buffs:IsSecret() and #buffs.Value == 0)
+      C_UnitAuras = nil
+      assert(not pcall(function() return buffs.Value end))
+      local rosterAPI = __wuiraModules.require("datasources.GroupMembers")
+      local raid, count = false, 0
+      function IsInRaid() return raid end
+      function GetNumGroupMembers() return count end
+      local group = new(rosterAPI.GroupMembers)
+      local party = new(rosterAPI.PartyMembers)
+      local raidMembers = new(rosterAPI.RaidMembers)
+      assert(#group.Value == 1 and group.Value[1] == "player")
+      assert(#party.Value == 0 and #raidMembers.Value == 0)
+      count = 3
+      assert(table.concat(party.Value, ",") == "player,party1,party2")
+      assert(table.concat(group.Value, ",") == "player,party1,party2")
+      raid, count = true, 10
+      assert(#party.Value == 0 and #raidMembers.Value == 10)
+      assert(group.Value[1] == "raid1" and group.Value[10] == "raid10")
+      count = {secret=true}
+      assert(group:IsSecret() and not pcall(function() return group.Value end))
+      count, raid = 0, false
+      assert(not group:IsSecret() and #group.Value == 1)
+      GetNumGroupMembers = nil
+      assert(not pcall(function() return group.Value end))
+      local unitAPI = __wuiraModules.require("datasources.UnitInfo")
+      local targetGUID, combat, allowed = "A", false, true
+      local isPlayer = true
+      function UnitIsPlayer(unit) return isPlayer end
+      function UnitClass(unit) return "Paladin", "PALADIN", 2 end
+      function UnitGUID(unit) return unit == "player" and "SELF" or targetGUID end
+      function UnitIsUnit(first,second) return first == second end
+      function InCombatLockdown() return combat end
+      function CanInspect(unit) return allowed end
+      local requests = 0
+      function NotifyInspect(unit) requests=requests+1 end
+      C_SpecializationInfo = {
+        GetNumSpecializationsForClassID=function(id) assert(id == 2); return 3 end,
+        GetSpecializationInfo=function(index,inspect,pet,unit,sex,group,classID)
+          assert(classID == 2 and not pet)
+          if inspect then assert(unit == "target") end
+          return index, "Tree"..index, "", 100+index, "DAMAGER", 1, index*5
+        end,
+      }
+      local unitSourceAPI = __wuiraModules.require("datasources.UnitSource")
+      local target = new(unitSourceAPI.UnitSource,"target")
+      assert(target.Is.PC == true and target.Is.Self == false and target.Value.guid == "A")
+      local class = new(unitAPI.ClassSource,target)
+      assert(class.Value.token == "PALADIN" and class.Value.id == 2)
+      local own = new(unitAPI.Specializations,"player")
+      assert(#own.Value == 3 and own.Value[3].pointsSpent == 15)
+      local specs = new(unitAPI.SpecSource,target)
+      assert(class.target == target and specs.target == target)
+      assert(new(auraAPI.Buffs,target).target == target)
+      assert(new(resources.HP,target).target == target)
+      assert(specs.Value == nil and requests == 0)
+      assert(specs:RequestInspect() and specs.Status == "pending" and requests == 1)
+      local listener = frames[#frames]
+      listener.onEvent(listener,"INSPECT_READY","OTHER")
+      assert(specs.Value == nil)
+      listener.onEvent(listener,"INSPECT_READY","A")
+      assert(specs.Status == "ready" and #specs.Value == 3 and listener.onEvent == nil)
+      targetGUID = "B"
+      assert(target.Value.guid == "B")
+      assert(specs.Value == nil and specs.Status == "idle")
+      combat = true
+      assert(not specs:RequestInspect() and requests == 1)
+      combat = false
+      assert(specs:RequestInspect())
+      listener = frames[#frames]
+      targetGUID = "C"
+      listener.onEvent(listener,"INSPECT_READY","B")
+      assert(specs.Value == nil and listener.onEvent == nil)
+      isPlayer = false
+      local previousRequests = requests
+      assert(class.Value == nil and specs.Value == nil and not specs:RequestInspect())
+      assert(requests == previousRequests)
+      isPlayer = {secret=true}
+      assert(target.Is.PC == nil)
+      assert(class:IsSecret() and specs:IsSecret() and not specs:RequestInspect())
     `;
     const file = path.join(fixture, "verify.lua");
     fs.writeFileSync(file, script);

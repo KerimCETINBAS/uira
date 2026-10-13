@@ -1,6 +1,6 @@
 {
   "name": "wuira",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": {
     "name": "Kerim Cetinbas",
     "email": "a.cetinbas@icloud.com"
@@ -50,6 +50,7 @@
     "tsconfig.json",
     "tsconfig.lib.json",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
