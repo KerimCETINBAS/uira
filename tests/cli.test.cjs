@@ -34,6 +34,7 @@ test("CLI creates and builds a standalone empty-JSX addon", async () => {
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(result.stderr, "");
     fs.appendFileSync(path.join(project, "src/index.tsx"), `
+import { UI } from "wuira";
 import { Cell, ProgressBar } from "wuira/ui";
 import { HP, Unit } from "wuira/datasources";
 const hp = new HP(Unit.Player);

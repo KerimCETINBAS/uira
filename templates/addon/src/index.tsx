@@ -1,9 +1,7 @@
-import "wuira/console-polyfill";
-import { UI, wuira } from "wuira";
+import { wuira } from "wuira";
 
 function App() {
     console.log("{{addonName}} loaded");
-    return <></>;
 }
 
 wuira.Mount(App);

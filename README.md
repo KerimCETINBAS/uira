@@ -195,6 +195,8 @@ An empty fragment creates no native frame. Only empty fragments are currently su
 
 `console.log/info/warn/error` use a global WoW console polyfill. Output goes to the local chat window, never to other players. The addon uses no Node.js runtime or stdin/stdout. `console.error` does not throw. Arguments are formatted with Lua `tostring`; objects are not deeply inspected. The CLI uses its own Node.js terminal console.
 
+Importing `wuira` installs the global console polyfill automatically. The shared TypeScript config loads its global declarations and uses Node16 module resolution for package exports; DOM typings are not required. `wuira.Mount` accepts a `Cell`, no value, or a function returning `Cell | void`, so addons without a visual tree can simply log and return.
+
 ## Build and distribution
 
 `wuira build` transpiles through `tsconfig.json`. It writes a standalone addon directory containing individual Lua modules, a loader, a startup file, and `<addonName>.toc`. The default output directory is `dist/`. The addon name lives in `wuira.config.mjs`; Interface version and other metadata live in `addon.toc.in`. The default Interface version, 16001, targets the Forever playground.

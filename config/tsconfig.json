@@ -2,10 +2,12 @@
   "$schema": "https://raw.githubusercontent.com/TypeScriptToLua/TypeScriptToLua/master/tsconfig-schema.json",
   "compilerOptions": {
     "target": "ESNext",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "lib": [
       "ESNext"
     ],
-    "types": [],
+    "types": ["wuira/console-polyfill"],
     "jsx": "react",
     "jsxFactory": "UI.createElement",
     "jsxFragmentFactory": "UI.Fragment",

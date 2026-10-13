@@ -1,4 +1,4 @@
-import type { Element } from "./ui/primitives/jsx";
+import type { Cell } from "./ui/Cell";
 import type { Anchor } from "./types/Position";
 import { mount, unmount } from "./ui/mount";
 
@@ -6,9 +6,9 @@ import { mount, unmount } from "./ui/mount";
 export class wuira {
     private constructor() {}
 
-    public static Mount(frame: Element | (() => Element), anchor?: Anchor, parent?: wuiraNativeFrame): wuiraNativeFrame | undefined {
+    public static Mount(frame: Cell | void | (() => Cell | void), anchor?: Anchor, parent?: wuiraNativeFrame): wuiraNativeFrame | undefined {
         const view = typeof frame === "function" ? frame() : frame;
-        if (view.kind === "empty") return undefined;
+        if (view === undefined || view.kind === "empty") return undefined;
         return mount(view, parent, anchor);
     }
 

@@ -6,6 +6,9 @@ import type { Spacing } from "../types/Spacing";
 
 export type Size = number | "inherit";
 
+/** Common visual descriptor accepted by the mounting API. */
+export interface Cell extends Element {}
+
 export type CellProps = {
     width: Size;
     height: Size;
@@ -21,6 +24,6 @@ export interface ICell extends Element {
     props: CellProps;
 }
 
-export function Cell(props: Partial<CellProps> & { child?: Element }, child?: Element): Element {
+export function Cell(props: Partial<CellProps> & { child?: Element }, child?: Element): Cell {
     return UI.createElement("cell", props, props.child ?? child ?? []);
 }
