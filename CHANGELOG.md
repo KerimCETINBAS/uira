@@ -9,6 +9,17 @@ with the release date and highlight breaking changes explicitly.
 
 No changes yet.
 
+## 0.1.4 — 2026-10-14
+
+### Added
+
+- Class-based stores with optional stable tokens, one-time readonly snapshots,
+  transactional callback updates, and observer subscriptions.
+- Memory-only stores when no token is declared; SavedVariables-backed records
+  when a token and registry persistence configuration are provided.
+- SavedVariables initialization after the owning addon's `ADDON_LOADED` event,
+  default restoration, collision checks, and serializable data validation.
+
 ## 0.1.3 — 2026-10-14
 
 ### Added

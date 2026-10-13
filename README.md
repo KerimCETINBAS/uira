@@ -309,6 +309,75 @@ Relative output paths resolve from the project directory. Absolute paths can tar
 
 The CLI, configuration, and build plugin use ESM (`.mjs`). Only Lua and TOC files are needed in game. `npm run build` in the framework repository generates distributable Lua modules and TypeScript declarations in `lib/`; addon builds include the framework modules they import.
 
+## Stores
+
+Use data classes to define defaults. Without a static token, records live only
+in memory and are keyed by the class itself:
+
+```ts
+import { Store, StoreRegistry } from "wuira/store";
+
+class SessionSettings extends Store {
+    CastSpellId = 1232;
+}
+
+const store = new StoreRegistry();
+const snapshot = store.get(SessionSettings); // One-time, deeply readonly copy.
+
+const unsubscribe = store.subscribe(SessionSettings, settings => {
+    console.log("New spell:", settings.CastSpellId);
+});
+
+store.set(SessionSettings, settings => {
+    settings.CastSpellId = 635;
+    return settings;
+});
+
+unsubscribe();
+```
+
+`get()` does not subscribe. `subscribe()` observes future commits and returns an
+unsubscribe function; call `get()` for initial data. Each subscriber receives an
+independent snapshot. `set()` works on a detached draft, validates the returned
+data, commits it, and sends one notification per observer. If the updater throws,
+the previous record is preserved. Stores contain data fields, not class methods.
+
+For persistence, declare a stable token and the owning addon's SavedVariables:
+
+```toc
+## SavedVariables: LumaUIDB
+```
+
+```ts
+class LumaSettings extends Store {
+    static readonly Token = "luma.settings";
+    CastSpellId = 1232;
+    Width = 220;
+}
+
+const store = new StoreRegistry({ addon: "LumaUI", variable: "LumaUIDB" });
+store.onReady(() => {
+    console.log(store.get(LumaSettings).Width);
+    store.set(LumaSettings, settings => {
+        settings.Width = 240;
+        return settings;
+    });
+});
+```
+
+Add the TOC declaration to the addon's `addon.toc.in`. The registry waits for
+`ADDON_LOADED` before opening persistent records. Tokenless records can still be
+used immediately. WoW writes the saved table on normal logout/reload; `set()`
+does not force a disk flush. Keep tokens stable across versions. New default
+fields are filled in and incompatible saved field types fall back to defaults;
+renaming keys or changing schema meaning still requires an application migration.
+
+Supported values are finite numbers, strings, booleans, arrays, and nested data
+objects. Functions, cycles, and secret values cannot be saved. Two classes cannot
+claim the same token within a registry. Share one registry instance per database.
+`Dispose()` removes its observers and pending initialization listener. Profile
+selection, schema migrations, and reactive widget binding are separate features.
+
 ## Development
 
 ```sh

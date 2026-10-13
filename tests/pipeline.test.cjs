@@ -412,6 +412,64 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       isPlayer = {secret=true}
       assert(target.Is.PC == nil)
       assert(class:IsSecret() and specs:IsSecret() and not specs:RequestInspect())
+      local storeAPI = __wuiraModules.require("store.index")
+      local Memory = {prototype={}}
+      Memory.prototype.__index=Memory.prototype
+      function Memory.prototype:____constructor() self.Width=220; self.nested={value=1} end
+      local Other = {prototype={}}
+      Other.prototype.__index=Other.prototype
+      function Other.prototype:____constructor() self.Width=99 end
+      local Persisted = {Token="luma.settings",prototype=Memory.prototype}
+      local options = {addon="LumaTest",variable="LumaTestDB"}
+      C_AddOns = nil
+      LumaTestDB = {["luma.settings"]={Width="bad",nested={value=5}}}
+      local registry = new(storeAPI.StoreRegistry,options)
+      assert(not registry.IsReady and not pcall(function() return registry:get(Persisted) end))
+      assert(registry:get(Memory).Width == 220 and registry:get(Other).Width == 99)
+      local ready = false
+      registry:onReady(function() ready=true end)
+      listener = frames[#frames]
+      listener.onEvent(listener,"ADDON_LOADED","OtherAddon")
+      assert(not ready)
+      listener.onEvent(listener,"ADDON_LOADED","LumaTest")
+      assert(ready and registry.IsReady and listener.onEvent == nil)
+      assert(registry:get(Persisted).Width == 220 and registry:get(Persisted).nested.value == 5)
+      local notifications = 0
+      local stop = registry:subscribe(Persisted,function(_,snapshot)
+        notifications=notifications+1
+        snapshot.Width=999
+      end)
+      assert(notifications == 0)
+      local snapshot = registry:get(Persisted)
+      snapshot.nested.value=999
+      assert(registry:get(Persisted).nested.value == 5)
+      local draftReference
+      registry:set(Persisted,function(_,draft)
+        draft.Width=240; draft.nested.value=6; draftReference=draft
+        return draft
+      end)
+      draftReference.Width=888
+      assert(notifications == 1 and registry:get(Persisted).Width == 240)
+      assert(LumaTestDB["luma.settings"].Width == 240)
+      assert(not pcall(function() registry:set(Persisted,function(_,draft)
+        draft.Width=500; error("abort")
+      end) end))
+      assert(notifications == 1 and registry:get(Persisted).Width == 240)
+      assert(not pcall(function() registry:set(Persisted,function(_,draft)
+        draft.nested.loop=draft; return draft
+      end) end))
+      assert(notifications == 1)
+      stop()
+      registry:set(Persisted,function(_,draft) draft.Width=260; return draft end)
+      assert(notifications == 1)
+      registry:set(Memory,function(_,draft) draft.Width=230; return draft end)
+      assert(LumaTestDB.Memory == nil and registry:get(Other).Width == 99)
+      C_AddOns={IsAddOnLoaded=function() return true end}
+      local reloaded = new(storeAPI.StoreRegistry,options)
+      assert(reloaded:get(Persisted).Width == 260 and reloaded:get(Memory).Width == 220)
+      local Collision = {Token="luma.settings",prototype=Memory.prototype}
+      assert(not pcall(function() reloaded:get(Collision) end))
+      registry:Dispose()
     `;
     const file = path.join(fixture, "verify.lua");
     fs.writeFileSync(file, script);
