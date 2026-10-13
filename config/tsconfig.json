@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/TypeScriptToLua/TypeScriptToLua/master/tsconfig-schema.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": [
+      "ESNext"
+    ],
+    "types": [],
+    "jsx": "react",
+    "jsxFactory": "UI.createElement",
+    "jsxFragmentFactory": "UI.Fragment",
+    "strict": true,
+    "noEmitOnError": true
+  },
+  "tstl": {
+    "luaTarget": "universal",
+    "luaLibImport": "inline",
+    "noImplicitGlobalVariables": true,
+    "luaPlugins": [
+      {
+        "name": "wuira/tools/wow-modules.mjs"
+      }
+    ]
+  }
+}

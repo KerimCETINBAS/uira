@@ -1,0 +1,76 @@
+{
+  "name": "wuira",
+  "version": "0.1.1",
+  "author": {
+    "name": "Kerim Cetinbas",
+    "email": "a.cetinbas@icloud.com"
+  },
+  "description": "TypeScript and JSX UI framework and addon CLI for WoW Forever",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.lua"
+    },
+    "./ui": {
+      "types": "./lib/ui/index.d.ts",
+      "default": "./lib/ui/index.lua"
+    },
+    "./datasources": {
+      "types": "./lib/datasources/index.d.ts",
+      "default": "./lib/datasources/index.lua"
+    },
+    "./console-polyfill": {
+      "types": "./lib/console-polyfill.d.ts",
+      "default": "./lib/console-polyfill.lua"
+    },
+    "./config/tsconfig.json": "./config/tsconfig.json",
+    "./tools/wow-modules.mjs": "./tools/wow-modules.mjs",
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "ui": [
+        "lib/ui/index.d.ts"
+      ],
+      "datasources": [
+        "lib/datasources/index.d.ts"
+      ],
+      "console-polyfill": [
+        "lib/console-polyfill.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "cli/",
+    "lib/",
+    "tools/",
+    "config/",
+    "templates/",
+    "tsconfig.json",
+    "tsconfig.lib.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT",
+  "bin": {
+    "wuira": "cli/wuira.mjs"
+  },
+  "scripts": {
+    "build": "node tools/build-library.mjs",
+    "prepack": "npm run build",
+    "watch": "tstl -p tsconfig.json --watch",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "devDependencies": {
+    "fengari-node-cli": "0.1.0"
+  },
+  "dependencies": {
+    "typescript": "6.0.2",
+    "typescript-to-lua": "1.37.1"
+  }
+}

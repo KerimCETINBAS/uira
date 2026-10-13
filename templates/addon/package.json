@@ -1,0 +1,11 @@
+{
+  "name": "{{packageName}}",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "wuira build",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": { "wuira": "{{frameworkVersion}}" }
+}

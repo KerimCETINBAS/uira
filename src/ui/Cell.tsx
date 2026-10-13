@@ -1,0 +1,26 @@
+import type { Element } from "./primitives/jsx";
+import { UI } from "./primitives/jsx";
+import type { Decorations } from "./decorations/Decorations";
+import type { Position } from "../types/Position";
+import type { Spacing } from "../types/Spacing";
+
+export type Size = number | "inherit";
+
+export type CellProps = {
+    width: Size;
+    height: Size;
+    margin?: Spacing;
+    padding?: Spacing;
+    /** Defaults to true: visual cells do not intercept mouse input. */
+    clickThrough?: boolean;
+    decorations?: Decorations;
+} & Position<ICell>;
+
+export interface ICell extends Element {
+    kind: "cell" | "flow" | "grid" | "progress";
+    props: CellProps;
+}
+
+export function Cell(props: Partial<CellProps> & { child?: Element }, child?: Element): Element {
+    return UI.createElement("cell", props, props.child ?? child ?? []);
+}
