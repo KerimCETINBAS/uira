@@ -1,0 +1,2 @@
+# Keep generated output byte-identical to the source generator on every OS.
+src/spells/*.ts text eol=lf

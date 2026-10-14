@@ -7,6 +7,11 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+### Fixed
+
+- Keep generated spell files in LF format on Windows checkouts so deterministic
+  generation checks compare identical bytes across operating systems.
+
 ## 0.2.1 — 2026-10-15
 
 ### Changed
