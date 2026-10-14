@@ -7,7 +7,69 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
-No changes yet.
+## 0.1.6 — 2026-10-14
+
+### Added
+
+- `wuira.registerCommand("/command", callback)` registers native slash commands,
+  passes parsed arguments as `(...args: string[])` and returns idempotent cleanup.
+  Quoted arguments preserve spaces and empty values. Names are case-insensitive;
+  existing commands are preserved and native hash/proxy entries are cleaned up.
+- Native `AddonSettings` canvas registration, normal JSX `Button` controls and
+  Cell `onMount` lifecycle callbacks with cleanup.
+- Generic `FrameMover` drag proxies and `KeybindCapture` hover-to-bind overlays.
+  Both stop editing in combat; protected actions remain configured outside combat.
+- `KnownSpells` caches learned player spellbook IDs, with rank-aware `Has`,
+  event-driven `onChange` subscriptions and disposal. World entry, level,
+  training and talent events refresh the list; reading it never polls the book.
+- `Cell.alpha` accepts fixed opacity or a live visual callback, including on
+  secure buttons. Opacity updates do not enable, disable or rewrite actions.
+- Named `Spells.HolyShock` and `Spells.Exorcism` identifiers.
+- Named Paladin utility spell identifiers: Divine Favor, Lay on Hands, Blessing
+  of Protection, Blessing of Freedom, Voice of Truth, and Hammer of Justice.
+- `TotemTimer` reads player-owned ground effects by spell ID or localized name,
+  matching ranks and passing opaque native durations directly to progress bars.
+  Restricted effect identities are not inspected or guessed.
+- `SecureButton`, a Cell-compatible JSX primitive backed by Forever's native
+  `SecureActionButtonTemplate`. Supports static spell, item, existing macro,
+  action-slot and target actions, a selected mouse button, and one visual child.
+  Native click handlers are preserved; actions execute on mouse release.
+  Protected trees must mount outside combat; visibility and unmount are deferred
+  until combat ends. Click-cast presets are not included yet.
+- Secure buttons accept temporary `binding` overrides with native key labels,
+  radial `cooldown` sources and a native completion flash through `finishGlow`.
+  Overrides are removed on unmount without changing saved key bindings.
+- `SpellSource` exposes localized secure actions, textures and cooldowns that
+  ignore the global cooldown. Added Judgement, Holy Strike and Consecration IDs.
+- `BlizzardUI.SkinMicroMenu()` styles Forever's existing micro menu with a flat
+  panel, muted icons and accent highlights. Native click handlers, tooltips,
+  notifications and layout remain owned by the game; styling waits during combat.
+- `wuira/skins` with `MicroBar` and a shared `NativeSkin` adapter. `render` receives
+  the adapter, including `mount(view, anchor)` and `OnHover`; custom mounts are
+  disposed with the skin without replacing native button scripts.
+- Generic `HoverTracker` secure trigger/popup frames, configurable auto-hide delay
+  and extra hover regions. Addons own layout, launcher presentation and themes.
+- Explicit action-slot capture/clear/restore APIs and opt-in empty native bars.
+  New backups require a manual reload before the explicit clear command. Native bar
+  descendants, event/update managers, and action UI registrations are disabled;
+  suppression runs independently of slot operations. Clear/restore never run
+  from world-entry or cursor events; refused calls are reported without automatic
+  retries. A restore command re-enables the stock UI after manual reload. No replacement bar
+  is created. Unsupported action types and conflicting restores are rejected.
+- Resource `onChange` subscriptions with unsubscribe callbacks. Widgets and
+  observers share one lazy native event listener per resource, reading its
+  current value once per event. Secret amounts never reach user callbacks.
+- `Mana.UseRegenTimer()` and its `RegenTimer` accessory: a cast-driven five-second
+  window followed by estimated two-second sweeps kept alive by mana events.
+  Full readable mana stops the clock; native alpha curves mask full secret mana.
+  Unmount cancels timers and detaches the accessory without stopping other users.
+
+### Fixed
+
+- Preserve saved entries in initially empty Store records when loading a new
+  registry; Lua's empty-table ambiguity no longer resets custom binding maps.
+- Honor explicit non-top-left anchors on a Cell's child, allowing thin overlays
+  to sit on the bottom edge of a progress bar.
 
 ## 0.1.5 — 2026-10-14
 

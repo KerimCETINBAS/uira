@@ -27,6 +27,35 @@ export class TimerSource extends DataSource<NativeDuration | undefined> {
         // Opaque combat timings stay native; never compare secret numbers in Lua.
         return issecretvalue(remaining) || remaining === undefined || remaining > 0;
     }
+    /** A native radial cooldown owns timing, countdown text and completion effects. */
+    public BindCooldown(frame: wuiraNativeCooldown): () => void {
+        if (C_DurationUtil === undefined) error("TimerSource: native duration support is unavailable");
+        const empty = C_DurationUtil.CreateDuration();
+        const listener = CreateFrame("Frame", undefined, UIParent);
+        const refresh = () => {
+            const duration = this.read();
+            this.boundDuration = duration;
+            frame.SetCooldownFromDurationObject(this.CanEmit(duration) ? duration ?? empty : empty, true);
+        };
+        listener.SetScript("OnEvent", (_frame, event, unit) => {
+            if (!event.startsWith("UNIT_") || this.unit === undefined || unit === this.unit) refresh();
+        });
+        for (const event of this.events) listener.RegisterEvent(event);
+        this.bindingCount += 1;
+        try { refresh(); }
+        catch (failure) { this.bindingCount -= 1; listener.UnregisterAllEvents(); listener.SetScript("OnEvent", undefined); throw failure; }
+        let disposed = false;
+        return () => {
+            if (disposed) return;
+            disposed = true;
+            this.bindingCount -= 1;
+            listener.UnregisterAllEvents();
+            listener.SetScript("OnEvent", undefined);
+            listener.Hide();
+            frame.SetDrawBling(false);
+            frame.Clear();
+        };
+    }
     public BindTo(frame: wuiraNativeStatusBar, options: ProgressOverrides = {}): () => void {
         if (options.min !== undefined || options.max !== undefined || options.current !== undefined) {
             error("TimerSource: min/max/current overrides are not supported");

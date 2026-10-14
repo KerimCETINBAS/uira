@@ -1,6 +1,6 @@
 {
   "name": "wuira",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "author": {
     "name": "Kerim Cetinbas",
     "email": "a.cetinbas@icloud.com"
@@ -24,6 +24,10 @@
       "types": "./lib/store/index.d.ts",
       "default": "./lib/store/index.lua"
     },
+    "./skins": {
+      "types": "./lib/skins/index.d.ts",
+      "default": "./lib/skins/index.lua"
+    },
     "./console-polyfill": {
       "types": "./lib/console-polyfill.d.ts",
       "default": "./lib/console-polyfill.lua"
@@ -42,6 +46,9 @@
       ],
       "store": [
         "lib/store/index.d.ts"
+      ],
+      "skins": [
+        "lib/skins/index.d.ts"
       ],
       "console-polyfill": [
         "lib/console-polyfill.d.ts"

@@ -3,12 +3,16 @@ import { Unit, UnitSource, resolveUnit } from "./UnitSource";
 import type { UnitInput } from "./UnitSource";
 import { DataSource } from "./DataSource";
 import type { ProgressOverrides } from "./ProgressSource";
+import { ManaRegenTimer } from "./ManaRegenTimer";
 
 export { Unit } from "./UnitSource";
 
 /** Direct API-to-widget binding; opaque values are never compared or calculated. */
 abstract class Resource extends ProgressSource {
-    private readonly listeners = new Set<wuiraNativeFrame>();
+    private readonly listeners = new Set<(event: string, payload: unknown[], value: number) => void>();
+    private eventFrame?: wuiraNativeFrame;
+    private dispatching = false;
+    private eventValue = 0;
     protected constructor(
         current: () => number,
         maximum: () => number,
@@ -23,22 +27,53 @@ abstract class Resource extends ProgressSource {
         for (const event of events) {
             if (this.events.includes(event)) continue;
             this.events.push(event);
-            for (const frame of this.listeners) frame.RegisterEvent(event);
+            if (this.listeners.size > 0) this.eventFrame?.RegisterEvent(event);
         }
     }
 
-    protected Listen(frame: wuiraNativeFrame, refresh: () => void): () => void {
-        this.listeners.add(frame);
-        frame.SetScript("OnEvent", (_frame, event, unit) => {
-            if (event === "PLAYER_ENTERING_WORLD" || unit === this.unitToken) refresh();
+    protected override GetValue(): number { return this.dispatching ? this.eventValue : super.GetValue(); }
+
+    /** Future readable value changes only. Unsubscribe when the consumer is removed. */
+    public onChange(listener: (value: number) => void): () => void {
+        let previous = this.GetValue();
+        let readable = !issecretvalue(previous);
+        return this.Observe((_, _payload, value) => {
+            if (issecretvalue(value) || !this.CanEmit(value)) return;
+            if (readable && value === previous) return;
+            previous = value;
+            readable = true;
+            listener(value);
         });
-        frame.RegisterEvent("PLAYER_ENTERING_WORLD");
-        for (const event of this.events) frame.RegisterEvent(event);
+    }
+
+    /** One native event frame is shared by widgets, observers, and accessories. */
+    protected Observe(listener: (event: string, payload: unknown[], value: number) => void): () => void {
+        this.listeners.add(listener);
+        if (this.listeners.size === 1) {
+            if (this.eventFrame === undefined) this.eventFrame = CreateFrame("Frame", undefined, UIParent);
+            const frame = this.eventFrame;
+            frame.SetScript("OnEvent", (_frame, event, ...payload: unknown[]) => {
+                if (event !== "PLAYER_ENTERING_WORLD" && (issecretvalue(payload[0]) || payload[0] !== this.unitToken)) return;
+                this.eventValue = super.GetValue();
+                this.dispatching = true;
+                try {
+                    for (const callback of this.listeners) callback(event, payload, this.eventValue);
+                } finally { this.dispatching = false; }
+            });
+            frame.RegisterEvent("PLAYER_ENTERING_WORLD");
+            for (const event of this.events) frame.RegisterEvent(event);
+        }
         return () => {
-            this.listeners.delete(frame);
-            frame.UnregisterAllEvents();
-            frame.SetScript("OnEvent", undefined);
+            this.listeners.delete(listener);
+            if (this.listeners.size === 0) {
+                this.eventFrame?.UnregisterAllEvents();
+                this.eventFrame?.SetScript("OnEvent", undefined);
+            }
         };
+    }
+
+    protected Listen(_frame: wuiraNativeFrame, refresh: () => void): () => void {
+        return this.Observe(() => refresh());
     }
 }
 
@@ -108,6 +143,16 @@ export class HP extends Resource {
 
 /** Explicit mana (power type 0), even while the unit uses rage/energy. */
 export class Mana extends Resource {
+    private regenTimer?: ManaRegenTimer;
+    public get RegenTimer(): ManaRegenTimer | undefined { return this.regenTimer; }
+    public UseRegenTimer(): this {
+        if (this.unit !== "player") error("Mana.UseRegenTimer: only the player is supported");
+        if (this.regenTimer === undefined) {
+            this.AddEvents("UNIT_SPELLCAST_SUCCEEDED");
+            this.regenTimer = new ManaRegenTimer(listener => this.Observe(listener));
+        }
+        return this;
+    }
     public readonly target: UnitSource;
     public get unit(): string { return this.target.Token; }
     public constructor(unit: UnitInput) {

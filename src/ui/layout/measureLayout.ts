@@ -31,7 +31,7 @@ export function measureLayout(
     ancestors: Element[] = [],
 ): MeasuredCell {
     if (ancestors.includes(element)) error("Layout children contain a cycle");
-    if (!["cell", "flow", "grid", "progress", "label", "icon"].includes(element.kind)) {
+    if (!["cell", "flow", "grid", "progress", "label", "icon", "button", "secureButton"].includes(element.kind)) {
         error(`Unsupported UI element: ${element.kind}`);
     }
     const cell = element as ICell;
@@ -79,7 +79,9 @@ export function measureLayout(
         }
     } else if (children.length > 0) {
         const position = children[0].cell.props;
-        if (position.mode === "relative" && position.relativeTo === undefined) {
+        if (position.mode === "relative" && position.relativeTo === undefined
+            && (position.anchor === undefined || position.anchor === "TOPLEFT")
+            && (position.relativeAnchor === undefined || position.relativeAnchor === "TOPLEFT")) {
             placements = [{ x: padding.left + position.offset.x, y: padding.top + position.offset.y }];
         }
     }

@@ -1,9 +1,17 @@
 import "./console-polyfill";
 export { wuira } from "./wuira";
+export type { CommandCallback } from "./platform/SlashCommands";
+export { AddonSettings } from "./platform/AddonSettings";
 export { Spells } from "./Spells";
 export { BlizzardUI } from "./platform/BlizzardUI";
+export { ActionBars } from "./platform/ActionBars";
+export type { ActionSlot, EmptyActionBarsOptions } from "./platform/ActionBars";
 export type { BlizzardUIOptions } from "./platform/BlizzardUI";
+export type { MicroMenuSkinOptions } from "./platform/MicroMenu";
 export { UI } from "./ui/primitives/jsx";
+export { HoverTracker } from "./ui/HoverTracker";
+export type { HoverTrackerOptions, HoverFrame } from "./ui/HoverTracker";
+export { MicroBar } from "./skins/MicroBar";
 export type { Element, Component } from "./ui/primitives/jsx";
 export type { Cell } from "./ui/Cell";
 export { Store, StoreRegistry } from "./store";

@@ -33,6 +33,9 @@ function copy(value: unknown, seen = new Set<object>()): unknown {
 /** Fill new fields and reject incompatible saved field types using current defaults. */
 function restore(defaults: unknown, saved: unknown): unknown {
     if (saved === undefined || typeof saved !== typeof defaults || saved === null) return copy(defaults);
+    // Empty Lua tables carry no array/object shape. Treat an empty default as
+    // an open data table so saved string-keyed records survive a new registry.
+    if (typeof defaults === "object" && defaults !== null && Object.keys(defaults).length === 0) return copy(saved);
     if (Array.isArray(defaults)) return Array.isArray(saved) ? copy(saved) : copy(defaults);
     if (typeof defaults === "object" && defaults !== null) {
         if (Array.isArray(saved)) return copy(defaults);

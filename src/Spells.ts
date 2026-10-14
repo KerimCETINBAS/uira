@@ -1,5 +1,16 @@
 /** Representative spell IDs; aura sources resolve localized names across ranks. */
 export enum Spells {
+    Judgement = 20271,
+    HolyStrike = 679,
+    Consecration = 26573,
+    HolyShock = 20473,
+    Exorcism = 879,
+    DivineFavor = 20216,
+    LayOnHands = 633,
+    BlessingOfProtection = 1022,
+    BlessingOfFreedom = 1044,
+    VoiceOfTruth = 1310897,
+    HammerOfJustice = 853,
     SealOfRighteousness = 21084,
     SealOfTheCrusader = 21082,
     SealOfCommand = 20375,

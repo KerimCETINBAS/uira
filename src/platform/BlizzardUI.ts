@@ -1,9 +1,11 @@
+import { skinMicroMenu } from "./MicroMenu";
+import type { MicroMenuSkinOptions } from "./MicroMenu";
+
 declare const _G: Record<string, unknown>;
 declare function InCombatLockdown(this: void): boolean;
+declare const C_ActionBar: { UnregisterActionUIButton?: (this: void, frame: wuiraNativeFrame) => void } | undefined;
 
 interface StockFrame extends wuiraNativeFrame {
-    GetParent(): wuiraNativeFrame;
-    HookScript(script: "OnShow", handler: (this: void, frame: StockFrame) => void): void;
 }
 
 export interface BlizzardUIOptions {
@@ -16,6 +18,50 @@ export interface BlizzardUIOptions {
 /** Opt-in stock UI visibility. Native buttons, bindings and event handlers remain intact. */
 export class BlizzardUI {
     private constructor() {}
+
+    /** Style native micro-menu buttons. Reload restores their original textures. */
+    public static SkinMicroMenu(options: MicroMenuSkinOptions = {}): () => void {
+        return skinMicroMenu(options);
+    }
+
+    /** Disable stock action-bar event/update paths. Restoring their scripts requires reload. */
+    public static DisableActionBars(): () => void {
+        const unhide = this.Hide({ actionBars: true });
+        const listener = CreateFrame("Frame", undefined, UIParent);
+        const roots = ["MainActionBar", "MainMenuBar", "MultiBarBottomLeft", "MultiBarBottomRight",
+            "MultiBarRight", "MultiBarLeft", "MultiBar5", "MultiBar6", "MultiBar7", "StanceBar", "PetActionBar"];
+        const managers = ["ActionBarController", "ActionBarButtonEventsFrame", "ActionBarActionEventsFrame",
+            "ActionBarButtonUpdateFrame", "ActionBarButtonRangeCheckFrame", "ActionBarButtonUsableWatcherFrame"];
+        const apply = () => {
+            if (InCombatLockdown()) return;
+            const seen = new Set<wuiraNativeFrame>();
+            const quiet = (frame: StockFrame | undefined) => {
+                if (frame === undefined || frame.UnregisterAllEvents === undefined || seen.has(frame)) return;
+                seen.add(frame);
+                frame.UnregisterAllEvents();
+                frame.SetScript("OnEvent", undefined);
+                frame.SetScript("OnUpdate", undefined);
+                if (frame.GetChildren !== undefined) {
+                    const children = [...frame.GetChildren()];
+                    for (const child of children) quiet(child as StockFrame);
+                }
+            };
+            for (const name of [...roots, ...managers]) quiet(_G[name] as StockFrame | undefined);
+            for (const prefix of ["ActionButton", "MultiBarBottomLeftButton", "MultiBarBottomRightButton",
+                "MultiBarRightButton", "MultiBarLeftButton", "MultiBar5Button", "MultiBar6Button", "MultiBar7Button"]) {
+                for (let index = 1; index <= 12; index += 1) {
+                    const button = _G[prefix + index] as wuiraNativeFrame | undefined;
+                    if (button !== undefined) C_ActionBar?.UnregisterActionUIButton?.(button);
+                }
+            }
+        };
+        listener.RegisterEvent("ADDON_LOADED");
+        listener.RegisterEvent("PLAYER_ENTERING_WORLD");
+        listener.RegisterEvent("PLAYER_REGEN_ENABLED");
+        listener.SetScript("OnEvent", apply);
+        apply();
+        return () => { listener.UnregisterAllEvents(); listener.SetScript("OnEvent", undefined); unhide(); };
+    }
 
     /** Returns a restore function; protected changes wait until combat ends. */
     public static Hide(options: BlizzardUIOptions): () => void {

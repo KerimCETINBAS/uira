@@ -1,6 +1,15 @@
 export { UI } from "./primitives/jsx";
+export { HoverTracker } from "./HoverTracker";
+export { FrameMover } from "./FrameMover";
+export type { FramePosition, FrameMoverOptions } from "./FrameMover";
+export { KeybindCapture } from "./KeybindCapture";
+export type { HoverTrackerOptions, HoverFrame } from "./HoverTracker";
 export type { Element, Component } from "./primitives/jsx";
 export { Cell } from "./Cell";
+export { Button } from "./Button";
+export type { ButtonProps } from "./Button";
+export { SecureButton } from "./SecureButton";
+export type { SecureAction, SecureButtonProps, MouseButton } from "./SecureButton";
 export type { CellProps } from "./Cell";
 export { FlowLayout } from "./FlowLayout";
 export { GridLayout } from "./GridLayout";

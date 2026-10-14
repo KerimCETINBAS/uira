@@ -34,7 +34,7 @@ export abstract class ProgressSource extends DataSource<number> {
 
     public BindTo(frame: wuiraNativeStatusBar, options: ProgressOverrides = {}): void | (() => void) {
         const refresh = () => {
-            const sourceValue = this.readers.current();
+            const sourceValue = this.GetValue();
             const active = this.CanEmit(sourceValue);
             options.onActiveChange?.(active);
             if (!active) return;
@@ -48,7 +48,7 @@ export abstract class ProgressSource extends DataSource<number> {
             options.onRefresh?.();
         };
         const dispose = this.Listen(frame, refresh);
-        refresh();
+        try { refresh(); } catch (failure) { dispose?.(); throw failure; }
         return dispose;
     }
 

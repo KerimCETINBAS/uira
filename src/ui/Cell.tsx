@@ -17,12 +17,16 @@ export type CellProps = {
     /** Defaults to true: visual cells do not intercept mouse input. */
     clickThrough?: boolean;
     decorations?: Decorations;
+    /** Visual opacity, including live callbacks; does not change secure actions. */
+    alpha?: number | (() => number);
+    /** Called after native configuration. The optional cleanup runs on unmount. */
+    onMount?: (frame: wuiraNativeFrame) => void | (() => void);
     /** Visibility does not remove the cell's reserved layout slot. */
     visible?: () => boolean;
 } & Position<ICell>;
 
 export interface ICell extends Element {
-    kind: "cell" | "flow" | "grid" | "progress" | "label" | "icon";
+    kind: "cell" | "flow" | "grid" | "progress" | "label" | "icon" | "button" | "secureButton";
     props: CellProps;
 }
 

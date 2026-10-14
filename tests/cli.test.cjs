@@ -35,15 +35,58 @@ test("CLI creates and builds a standalone empty-JSX addon", async () => {
     assert.equal(result.stderr, "");
     fs.appendFileSync(path.join(project, "src/index.tsx"), `
 import { UI } from "wuira";
-import { Cell, ProgressBar } from "wuira/ui";
+import { Cell, ProgressBar, SecureButton, Button, FrameMover, KeybindCapture } from "wuira/ui";
 import { HP, Unit } from "wuira/datasources";
+import { SpellSource, KnownSpells } from "wuira/datasources";
 const hp = new HP(Unit.Player);
 const predictedHP = new HP().UseHealPrediction().UseAbsorbPrediction().When(value => value >= 20);
+import { Mana } from "wuira/datasources";
+const manaWithRegen = new Mana(Unit.Player).UseRegenTimer();
+if (manaWithRegen.RegenTimer === undefined) throw "Regen accessory missing";
+if (false) {
+    const stop = manaWithRegen.onChange(value => console.log(value.toFixed(0)));
+    stop();
+}
 const predictedView = <ProgressBar source={predictedHP} healPrediction={{texture:"blizzard"}} absorbPrediction={{color:{r:1,g:1,b:1,a:0.5}}} />;
 if (predictedHP.HealPrediction === undefined || predictedHP.AbsorbPrediction === undefined || predictedView.kind !== "progress") throw "Prediction exports failed";
 // @ts-expect-error HP predicates receive numbers.
 new HP().When(value => value.missing);
 const view = <Cell width={160} height={24}><ProgressBar source={hp} /></Cell>;
+const secureView = <SecureButton width={32} height={32} action={{type:"spell",spell:635,unit:Unit.Player}}><Cell /></SecureButton>;
+const slotView = <secureButton action={{type:"action",slot:25}} />;
+if (false) {
+    const unregister = wuira.registerCommand("/hello", (...args: string[]) => console.log(...args));
+    wuira.registerCommand("/optional", (...args) => console.log(args.at(0)?.toUpperCase()));
+    unregister();
+    // @ts-expect-error Command arguments are strings.
+    wuira.registerCommand("/bad", (message: number) => console.log(message));
+    const settingsButton = <Button onClick={() => console.log("settings")} onMount={frame => {
+        const mover = new FrameMover(frame, {label: "Panel", onMove: position => console.log(position.x)});
+        return () => mover.Dispose();
+    }} />;
+    const capture = new KeybindCapture(() => console.log("done"));
+    capture.SetActive(false);
+    capture.Dispose();
+    const known = new KnownSpells();
+    const ids: readonly number[] = known.Value;
+    const learned: boolean = known.Has(20271);
+    const stop = known.onChange(spells => console.log(spells.length));
+    stop();
+    known.Dispose();
+    // @ts-expect-error Spell snapshots are readonly.
+    ids.push(20271);
+    const spell = new SpellSource(20271);
+    const button = <SecureButton action={spell.Action} binding="1" cooldown={spell.Cooldown} finishGlow alpha={() => 0.4} />;
+    // @ts-expect-error Key bindings are strings.
+    const invalidBinding = <SecureButton binding={1} />;
+}
+if (secureView.kind !== "secureButton" || slotView.kind !== "secureButton") throw "Secure exports failed";
+// @ts-expect-error Secure spell actions need a spell reference.
+const invalidSecureAction = <SecureButton action={{type:"spell"}} />;
+// @ts-expect-error A secure button must receive mouse input.
+const invalidClickThrough = <SecureButton clickThrough />;
+// @ts-expect-error Secure units must be static tokens, not callbacks.
+const invalidSecureUnit = <SecureButton action={{type:"spell",spell:635,unit:() => "target"}} />;
 if (view.kind !== "cell" || view.child?.source !== hp) throw "Public exports failed";
 // @ts-expect-error Width must be a number or inherit.
 const invalid = <Cell width="invalid" />;

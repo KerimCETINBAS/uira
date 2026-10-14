@@ -11,13 +11,44 @@ import type { LabelProps } from "./Label";
 import type { IconProps } from "./Icon";
 import { HP } from "../datasources/Resources";
 import type { TextureOptions } from "../types/Texture";
+import type { SecureButtonProps } from "./SecureButton";
+import type { ButtonProps } from "./Button";
+import { createSecureButton, configureSecureButton, validateSecureButton } from "../platform/SecureButton";
+
+interface MountedTree {
+    frames: wuiraNativeFrame[];
+    cells: ICell[];
+    decorations: Decoration[];
+    bindings: (() => void)[];
+    protected: boolean;
+    pendingUnmount: boolean;
+    visibility: (() => void)[];
+    listener?: wuiraNativeFrame;
+}
 
 const mountedFrames = new Map<CellProps, wuiraNativeFrame>();
-const mountedTrees = new Map<wuiraNativeFrame, { frames: wuiraNativeFrame[]; cells: ICell[]; decorations: Decoration[]; bindings: (() => void)[] }>();
+const mountedTrees = new Map<wuiraNativeFrame, MountedTree>();
+
+function protect(root: wuiraNativeFrame, tree: MountedTree): boolean {
+    if (!tree.protected && root.IsProtected?.() !== true) return false;
+    tree.protected = true;
+    if (tree.listener === undefined) {
+        const listener = CreateFrame("Frame", undefined, UIParent);
+        tree.listener = listener;
+        tree.frames.push(listener);
+        listener.RegisterEvent("PLAYER_REGEN_ENABLED");
+        listener.SetScript("OnEvent", () => {
+            if (tree.pendingUnmount) unmount(root);
+            else for (const refresh of tree.visibility) refresh();
+        });
+    }
+    return true;
+}
 
 export function unmount(frame: wuiraNativeFrame): void {
     const tree = mountedTrees.get(frame);
     if (tree === undefined) return;
+    if (protect(frame, tree) && InCombatLockdown()) { tree.pendingUnmount = true; return; }
     for (const dispose of tree.bindings) dispose();
     for (const decoration of tree.decorations) decoration.dispose();
     for (const child of tree.frames) {
@@ -34,15 +65,36 @@ export function unmount(frame: wuiraNativeFrame): void {
 export function mount(element: Element, parent: wuiraNativeFrame = UIParent, rootAnchor?: Anchor): wuiraNativeFrame {
     const frames = new Map<CellProps, wuiraNativeFrame>();
     const pending: { cell: ICell; width: number; height: number; margin: MeasuredCell["margin"]; frame: wuiraNativeFrame; parent: wuiraNativeFrame; placement?: { x: number; y: number } }[] = [];
+    const rootProps = (element as ICell).props;
+    const measured = measureLayout(element, {
+        width: rootProps.width === "inherit" ? parent.GetWidth() : undefined,
+        height: rootProps.height === "inherit" ? parent.GetHeight() : undefined,
+    });
+    // UIParent itself can be protected without restricting ordinary addon widgets.
+    let protectedTree = parent !== UIParent && (parent.IsProtected?.() ?? false);
+    const seen = new Set<CellProps>();
+    function validate(item: MeasuredCell): void {
+        if (seen.has(item.cell.props) || mountedFrames.has(item.cell.props)) error("A Cell can only be mounted once at a time");
+        seen.add(item.cell.props);
+        if (item.cell.kind === "secureButton") {
+            protectedTree = true;
+            validateSecureButton(item.cell.props as SecureButtonProps);
+        }
+        for (const child of item.children) validate(child);
+    }
+    validate(measured);
+    if (protectedTree && InCombatLockdown()) error("SecureButton: mount protected UI outside combat");
 
     function create(measured: MeasuredCell, parent: wuiraNativeFrame, placement?: { x: number; y: number }): wuiraNativeFrame {
         const { cell, width, height } = measured;
         if (frames.has(cell.props) || mountedFrames.has(cell.props)) error("A Cell can only be mounted once at a time");
         const frame = cell.kind === "progress"
             ? CreateFrame("StatusBar", undefined, parent)
+            : cell.kind === "secureButton" ? createSecureButton(parent, cell.props as SecureButtonProps)
+            : cell.kind === "button" ? CreateFrame("Button", undefined, parent)
             : CreateFrame("Frame", undefined, parent);
         frame.Hide();
-        frame.EnableMouse(!(cell.props.clickThrough ?? true));
+        frame.EnableMouse(cell.kind === "secureButton" || cell.kind === "button" || !(cell.props.clickThrough ?? true));
         frames.set(cell.props, frame);
         pending.push({ cell, width, height, margin: measured.margin, frame, parent, placement });
         frame.SetSize(width, height);
@@ -52,11 +104,7 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
         return frame;
     }
 
-    const rootProps = (element as ICell).props;
-    const root = create(measureLayout(element, {
-        width: rootProps.width === "inherit" ? parent.GetWidth() : undefined,
-        height: rootProps.height === "inherit" ? parent.GetHeight() : undefined,
-    }), parent);
+    const root = create(measured, parent);
     const anchors = new Map<wuiraNativeFrame, wuiraNativeFrame>();
     for (const item of pending) {
         const position = item.cell.props;
@@ -81,22 +129,39 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
             target = anchors.get(target);
         }
     }
-    const tree = { frames: pending.map(item => item.frame), cells: pending.map(item => item.cell), decorations: [] as Decoration[], bindings: [] as (() => void)[] };
+    const tree: MountedTree = { frames: pending.map(item => item.frame), cells: pending.map(item => item.cell),
+        decorations: [], bindings: [], protected: protectedTree, pendingUnmount: false, visibility: [] };
     mountedTrees.set(root, tree);
     try {
         const updates: (() => void)[] = [];
+        protect(root, tree);
         for (const item of pending) {
             let sourceActive = true;
             let lastVisible: boolean | undefined;
             const visible = item.cell.props.visible;
             const refreshVisibility = () => {
+                if (protect(root, tree) && InCombatLockdown()) return;
                 const value = sourceActive && (visible?.() ?? true);
                 if (value === lastVisible) return;
                 lastVisible = value;
                 if (value) item.frame.Show(); else item.frame.Hide();
             };
+            tree.visibility.push(refreshVisibility);
             const onActiveChange = (active: boolean) => { sourceActive = active; refreshVisibility(); };
             const position = item.cell.props;
+            if (position.alpha !== undefined) {
+                const alpha = position.alpha;
+                let previous: number | undefined;
+                const refreshAlpha = () => {
+                    const value = typeof alpha === "function" ? alpha() : alpha;
+                    if (issecretvalue(value)) return;
+                    if (!Number.isFinite(value) || value < 0 || value > 1) error("Cell alpha must be between 0 and 1");
+                    if (value !== previous) item.frame.SetAlpha(value);
+                    previous = value;
+                };
+                refreshAlpha();
+                if (typeof alpha === "function") updates.push(refreshAlpha);
+            }
             const target = anchors.get(item.frame)!;
             const x = item.placement?.x ?? (position.mode === "absolute" ? position.x : position.offset.x);
             const y = item.placement?.y ?? (position.mode === "absolute" ? position.y : position.offset.y);
@@ -104,6 +169,43 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
             const anchor = overrideAnchor ?? (item.placement !== undefined ? "TOPLEFT" : position.anchor ?? "TOPLEFT");
             const relativeAnchor = overrideAnchor ?? (item.placement !== undefined ? "TOPLEFT" : position.relativeAnchor ?? anchor);
             item.frame.SetPoint(anchor, target, relativeAnchor, x + item.margin.left, -(y + item.margin.top));
+            if (item.cell.kind === "secureButton") {
+                const props = item.cell.props as SecureButtonProps;
+                tree.bindings.push(configureSecureButton(item.frame as wuiraNativeSecureButton, props));
+                if (props.cooldown !== undefined) {
+                    const cooldown = CreateFrame("Cooldown", undefined, item.frame, "CooldownFrameTemplate");
+                    tree.frames.push(cooldown);
+                    cooldown.EnableMouse(false);
+                    cooldown.SetAllPoints(item.frame);
+                    cooldown.SetFrameLevel(item.frame.GetFrameLevel() + 2);
+                    cooldown.SetDrawSwipe(true);
+                    cooldown.SetDrawEdge(false);
+                    cooldown.SetDrawBling(props.finishGlow ?? false);
+                    cooldown.SetHideCountdownNumbers(false);
+                    cooldown.SetSwipeColor(0, 0, 0, 0.7);
+                    cooldown.GetCountdownFontString().SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE");
+                    tree.bindings.push(props.cooldown.BindCooldown(cooldown));
+                }
+                if (props.binding !== undefined && props.showHotkey !== false) {
+                    const overlay = CreateFrame("Frame", undefined, item.frame);
+                    tree.frames.push(overlay);
+                    overlay.EnableMouse(false);
+                    overlay.SetAllPoints(item.frame);
+                    overlay.SetFrameLevel(item.frame.GetFrameLevel() + 3);
+                    const hotkey = overlay.CreateFontString(undefined, "OVERLAY");
+                    hotkey.SetAllPoints(overlay);
+                    hotkey.SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE");
+                    hotkey.SetJustifyH("RIGHT");
+                    hotkey.SetJustifyV("TOP");
+                    hotkey.SetTextColor(1, 1, 1, 1);
+                    hotkey.SetText(props.binding);
+                }
+            }
+            if (item.cell.kind === "button") {
+                const onClick = (item.cell.props as ButtonProps).onClick;
+                item.frame.SetScript("OnClick", onClick === undefined ? undefined : () => onClick());
+                tree.bindings.push(() => item.frame.SetScript("OnClick", undefined));
+            }
             if (item.cell.kind === "label") {
                 const props = item.cell.props as LabelProps;
                 const label = item.frame.CreateFontString(undefined, "OVERLAY");
@@ -218,6 +320,8 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
             attach(decorations?.glow);
             mountedFrames.set(item.cell.props, item.frame);
             refreshVisibility();
+            const cleanup = item.cell.props.onMount?.(item.frame);
+            if (cleanup !== undefined) tree.bindings.push(cleanup);
             if (visible !== undefined) {
                 updates.push(refreshVisibility);
             }

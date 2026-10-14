@@ -24,24 +24,44 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       UIParent = {}
       local health,maxHealth,mana,maxMana = 650,1000,120,200
       local healthPercent,manaPercent = 65,60
+      local powerReads,nativeManaAlpha=0,1
       CurveConstants = {ScaleTo100={}}
       function UnitHealthPercent(unit,predicted,curve)
         assert(unit == "player" and predicted and curve == CurveConstants.ScaleTo100)
         return healthPercent
       end
       function UnitPowerPercent(unit,powerType,predicted,curve)
-        assert(unit == "player" and powerType == 0 and predicted and curve == CurveConstants.ScaleTo100)
-        return manaPercent
+        assert(unit == "player" and powerType == 0 and predicted)
+        if curve == CurveConstants.ScaleTo100 then return manaPercent end
+        assert(curve.points)
+        return nativeManaAlpha
       end
       function UnitHealth(unit) assert(unit == "player"); return health end
       function UnitHealthMax(unit) assert(unit == "player"); return maxHealth end
-      function UnitPower(unit,powerType) assert(unit == "player" and powerType == 0); return mana end
+      function UnitPower(unit,powerType) assert(unit == "player" and powerType == 0); powerReads=powerReads+1; return mana end
       function UnitPowerMax(unit,powerType) assert(unit == "player" and powerType == 0); return maxMana end
       function issecretvalue(value) return type(value) == "table" and rawget(value,"secret") == true end
       local frames = {}
+      local nativeFrames = {}
+      local function emit(event,...)
+        for _,frame in ipairs(nativeFrames) do
+          if frame.events and frame.events[event] and frame.onEvent then frame.onEvent(frame,event,...) end
+        end
+      end
       function CreateFrame(kind, name, parent, template)
-        assert((kind == "Frame" or kind == "StatusBar") and name == nil)
-        local frame = { kind = kind, parent = parent, template = template, textures = {} }
+        assert((kind == "Frame" or kind == "StatusBar" or kind == "Button" or kind == "Cooldown") and (name == nil or kind == "Button"))
+        local frame = { kind = kind, name=name, parent = parent, template = template, textures = {},events={} }
+        if name then _G[name]=frame end
+        function frame:GetName() return self.name end
+        function frame:SetCooldownFromDurationObject(duration,clear) self.cooldownDuration=duration; self.clearIfZero=clear end
+        function frame:SetDrawSwipe(value) self.drawSwipe=value end
+        function frame:SetDrawEdge(value) self.drawEdge=value end
+        function frame:SetDrawBling(value) self.drawBling=value end
+        function frame:SetHideCountdownNumbers(value) self.hideNumbers=value end
+        function frame:SetSwipeColor(...) self.swipeColor={...} end
+        function frame:Clear() self.cooldownDuration=nil end
+        function frame:GetCountdownFontString() return self.fontString or self:CreateFontString() end
+        function frame:SetAlpha(value) self.alpha=value end
         function frame:SetMinMaxValues(min,max) self.min,self.max=min,max end
         function frame:SetValue(value) self.value=value end
         function frame:SetTimerDuration(duration,interpolation,direction)
@@ -78,7 +98,22 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         function frame:RegisterEvent(event) self.events = self.events or {}; self.events[event] = true end
         function frame:UnregisterAllEvents() self.events = {} end
         function frame:SetScript(script, handler)
-          if script == "OnUpdate" then self.onUpdate = handler else self.onEvent = handler end
+          self.scripts=self.scripts or {}; self.scripts[script]=handler
+          if script == "OnUpdate" then self.onUpdate = handler elseif script == "OnEvent" then self.onEvent = handler end
+        end
+        function frame:IsShown() return self.shown == true end
+        function frame:SetFrameStrata(value) self.strata=value end
+        function frame:SetMovable(value) self.movable=value end
+        function frame:SetClampedToScreen(value) self.clamped=value end
+        function frame:RegisterForDrag(...) self.dragButtons={...} end
+        function frame:StartMoving() self.moving=true end
+        function frame:StopMovingOrSizing() self.moving=false end
+        function frame:EnableKeyboard(value) self.keyboard=value end
+        function frame:SetPropagateKeyboardInput(value) self.propagate=value end
+        function frame:GetCenter()
+          local x,y=0,0
+          if self.relative and self.relative.GetCenter then x,y=self.relative:GetCenter() end
+          return x+(self.x or 0),y+(self.y or 0)
         end
         function frame:SetClipsChildren(value) self.clipsChildren=value end
         function frame:GetFrameLevel() return self.frameLevel or 0 end
@@ -120,6 +155,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         function frame:SetBackdrop(info) self.backdrop = info end
         function frame:SetBackdropBorderColor(r,g,b,a) self.borderColor = {r,g,b,a} end
         frames[#frames + 1] = frame
+        nativeFrames[#nativeFrames + 1] = frame
         return frame
       end
       ${loads.join("\n")}
@@ -141,7 +177,8 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         factory(nil,"progress",{source=construct(resources.Mana,"player"),height=24,margin=2,color={r=0.15,g=0.4,b=1}})
       }))
       __wuiraModules.require("wuira").wuira.Mount(nil,demo,"CENTER")
-      assert(#frames == 5)
+      assert(#frames == 7)
+      local healthEvents,manaEvents=frames[6],frames[7]
       local box = frames[1]
       assert(box.parent == UIParent and box.width == 160 and box.height == 80)
       assert(box.x == 0 and box.y == 0 and box.shown and box.anchor == "CENTER" and box.relativeAnchor == "CENTER")
@@ -165,15 +202,15 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(frames[5].backdrop.edgeSize == 16 and frames[5].shown)
       assert(frames[5].mouseEnabled == false)
       health,maxHealth = 300,1200
-      demoBar.onEvent(demoBar,"UNIT_HEALTH","target")
+      emit("UNIT_HEALTH","target")
       assert(demoBar.value == 650)
-      demoBar.onEvent(demoBar,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(demoBar.value == 300 and demoBar.max == 1200)
       mana,maxMana = 70,250
-      manaBar.onEvent(manaBar,"UNIT_MAXPOWER","player")
+      emit("UNIT_MAXPOWER","player")
       assert(manaBar.value == 70 and manaBar.max == 250 and demoBar.value == 300)
       health = {secret=true}
-      demoBar.onEvent(demoBar,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(demoBar.value == health) -- Opaque data goes straight to native display, never through compute.
       frames = {box} -- Keep subsequent geometry assertions independent of the demo decoration.
       local mount = __wuiraModules.require("ui.mount").mount
@@ -212,9 +249,9 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(hpSource.Min.Value == 0 and hpSource.Percent.Value == 65)
       local overridden = CreateFrame("StatusBar",nil,UIParent)
       hpSource:BindTo(overridden,{min=10,max=100,current=25})
-      overridden.onEvent(overridden,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(overridden.min == 10 and overridden.max == 100 and overridden.value == 25)
-      assert(demoBar.events.UNIT_HEALTH and manaBar.events.UNIT_POWER_UPDATE)
+      assert(healthEvents.events.UNIT_HEALTH and manaEvents.events.UNIT_POWER_UPDATE)
       __wuiraModules.require("ui.mount").unmount(nil,box)
       assert(next(demoBar.events) == nil and demoBar.onEvent == nil and not demoBar.shown)
       assert(next(manaBar.events) == nil and manaBar.onEvent == nil and not box.shown)
@@ -437,7 +474,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       local storeAPI = __wuiraModules.require("store.index")
       local Memory = {prototype={}}
       Memory.prototype.__index=Memory.prototype
-      function Memory.prototype:____constructor() self.Width=220; self.nested={value=1} end
+      function Memory.prototype:____constructor() self.Width=220; self.nested={value=1}; self.bindings={} end
       local Other = {prototype={}}
       Other.prototype.__index=Other.prototype
       function Other.prototype:____constructor() self.Width=99 end
@@ -467,7 +504,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(registry:get(Persisted).nested.value == 5)
       local draftReference
       registry:set(Persisted,function(_,draft)
-        draft.Width=240; draft.nested.value=6; draftReference=draft
+        draft.Width=240; draft.nested.value=6; draft.bindings["679"]="CTRL-K"; draftReference=draft
         return draft
       end)
       draftReference.Width=888
@@ -489,6 +526,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       C_AddOns={IsAddOnLoaded=function() return true end}
       local reloaded = new(storeAPI.StoreRegistry,options)
       assert(reloaded:get(Persisted).Width == 260 and reloaded:get(Memory).Width == 220)
+      assert(reloaded:get(Persisted).bindings["679"] == "CTRL-K")
       local Collision = {Token="luma.settings",prototype=Memory.prototype}
       assert(not pcall(function() reloaded:get(Collision) end))
       registry:Dispose()
@@ -569,7 +607,130 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(activeFrame.shown and activeFrame.fontString.text == "Flash of Light")
       API.Unmount(nil,activeFrame)
       assert(driver.onUpdate == nil and not driver.shown)
+      do
+      local function verifyTotemTimer()
+        local timerClass=__wuiraModules.require("datasources.TotemTimer").TotemTimer
+        local oldSpell=C_Spell
+        C_Spell={GetSpellName=function(id) assert(id == 26573); return "Consecration" end}
+        local effects={}
+        local remaining=8
+        local duration={GetRemainingDuration=function() return remaining end}
+        function GetNumTotemSlots() return 4 end
+        function GetTotemInfo(slot)
+          local effect=effects[slot]
+          if not effect then return false,"",0,0,0,1,0 end
+          -- Secret numerical timings must never be compared or reconstructed.
+          return true,effect.name,{secret=true},{secret=true},123,1,effect.id
+        end
+        function GetTotemDuration(slot) assert(slot == 2); return duration end
+        local source=new(timerClass,26573)
+        assert(source.Status == "inactive" and not source.IsActive)
+        effects[1]={name="Unrelated ground effect",id=999}
+        local view=factory(nil,"progress",{width=220,height=2,source=source,
+          background=false,backdrop=false,visible=function() return source.IsActive end})
+        local bar=API.Mount(nil,view)
+        local visibility=frames[#frames]
+        assert(not bar.shown)
+        effects[2]={name="Consecration",id=20116} -- Different rank, discovered outside slot 1.
+        emit("PLAYER_TOTEM_UPDATE",2)
+        visibility.onUpdate(visibility,.05)
+        assert(bar.timer == duration and bar.shown and source.Status == "active")
+        remaining=0
+        visibility.onUpdate(visibility,.05)
+        assert(not bar.shown) -- Native timer expiration requires no totem removal event.
+        remaining=8
+        effects[2]={name="Consecration",id={secret=true}}
+        emit("PLAYER_TOTEM_UPDATE",2)
+        visibility.onUpdate(visibility,.05)
+        assert(bar.shown and bar.timer == duration) -- Public identity permits opaque timing.
+        effects[2]={name={secret=true},id={secret=true}}
+        emit("PLAYER_TOTEM_UPDATE",2)
+        visibility.onUpdate(visibility,.05)
+        assert(not bar.shown and source.Status == "restricted")
+        effects[2]=nil
+        emit("PLAYER_TOTEM_UPDATE",2)
+        assert(source.Status == "inactive")
+        API.Unmount(nil,bar)
+        assert(next(bar.events) == nil and bar.onEvent == nil)
+        GetTotemDuration=nil
+        assert(source.Status == "unavailable")
+        GetTotemInfo=nil; GetNumTotemSlots=nil; C_Spell=oldSpell
+      end
+      verifyTotemTimer()
+      end
       local stock = __wuiraModules.require("platform.BlizzardUI").BlizzardUI
+      do
+      local function verifyKnownSpells()
+        local oldBook,oldSpell,oldEnum=C_SpellBook,C_Spell,Enum
+        Enum={SpellBookSpellBank={Player=0},SpellBookItemType={Spell=1}}
+        local reads=0
+        local items={
+          {spellID=20287,name="Seal of Righteousness",itemType=1},
+          {spellID=20287,name="Seal of Righteousness",itemType=1}, -- Duplicate entry.
+          {spellID=21082,name="Seal of the Crusader",itemType=2}, -- Future spell.
+          {spellID=20375,name="Seal of Command",itemType=1,isOffSpec=true},
+          {spellID=20216,name="Divine Favor",itemType=1,isPassive=true},
+        }
+        C_SpellBook={
+          GetNumSpellBookSkillLines=function() reads=reads+1; return 1 end,
+          GetSpellBookSkillLineInfo=function(line) assert(line == 1); return {itemIndexOffset=0,numSpellBookItems=#items} end,
+          GetSpellBookItemInfo=function(slot,bank) assert(bank == 0); return items[slot] end,
+        }
+        C_Spell={GetSpellName=function(id)
+          if id == 21084 then return "Seal of Righteousness" end
+          return "Other spell"
+        end}
+        local class=__wuiraModules.require("datasources.KnownSpells").KnownSpells
+        local source=new(class)
+        local frame=frames[#frames]
+        assert(frame.onUpdate == nil and source.Status == "ready")
+        assert(#source.Value == 2 and source:Has(21084) and source:Has(20287))
+        assert(not source:Has(21082) and not source:Has(20375))
+        local count=reads
+        local snapshot=source.Value
+        snapshot[1]=0
+        assert(source.Value[1] ~= 0 and reads == count) -- Read copies cached data, never the book.
+        local changes=0
+        local stop=source:onChange(function(_,value) changes=changes+1; assert(#value > 0) end)
+        assert(changes == 0)
+        emit("SPELLS_CHANGED")
+        assert(changes == 0 and reads == count+1)
+        items[3].itemType=1
+        emit("LEARNED_SPELL_IN_SKILL_LINE",21082,1,false)
+        assert(changes == 1 and source:Has(21082))
+        items[4].isOffSpec=false
+        emit("PLAYER_TALENT_UPDATE")
+        assert(changes == 2 and source:Has(20375))
+        emit("PLAYER_LEVEL_UP",40)
+        assert(changes == 2)
+        items[1].spellID={secret=true}
+        emit("SPELLS_CHANGED")
+        assert(source.Status == "restricted" and not pcall(function() return source.Value end))
+        items[1].spellID=20287
+        emit("PLAYER_ENTERING_WORLD")
+        assert(source.Status == "ready" and changes == 3)
+        stop()
+        items[3].itemType=2
+        emit("SPELLS_CHANGED")
+        assert(changes == 3)
+        source:Dispose()
+        assert(next(frame.events) == nil and frame.onEvent == nil)
+        C_SpellBook=nil
+        function GetNumSpellTabs() return 1 end
+        function GetSpellTabInfo() return "Holy",123,0,2 end
+        function GetSpellBookItemInfo(slot,bank)
+          assert(bank == "spell")
+          if slot == 1 then return "SPELL",633 end
+          return "FUTURESPELL",879
+        end
+        local legacy=new(class)
+        assert(#legacy.Value == 1 and legacy.Value[1] == 633)
+        legacy:Dispose()
+        GetNumSpellTabs=nil; GetSpellTabInfo=nil; GetSpellBookItemInfo=nil
+        C_SpellBook,C_Spell,Enum=oldBook,oldSpell,oldEnum
+      end
+      verifyKnownSpells()
+      end
       PlayerFrame=CreateFrame("Frame",nil,UIParent)
       TargetFrame=CreateFrame("Frame",nil,UIParent)
       FocusFrame=CreateFrame("Frame",nil,UIParent)
@@ -625,38 +786,39 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       local predictedFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=predictedHP,
         healPrediction={texture="heal-path"},absorbPrediction={texture="shield-path"}}))
       local healFrame,shieldFrame=frames[before+2],frames[before+3]
-      assert(#frames == before+3 and not predictedFrame.shown and predictedFrame.value == nil)
+      assert(#frames == before+4 and not predictedFrame.shown and predictedFrame.value == nil)
       assert(healReads == 0 and absorbReads == 0 and predictedFrame.onUpdate == nil)
-      assert(predictedFrame.events.UNIT_HEAL_PREDICTION and predictedFrame.events.UNIT_ABSORB_AMOUNT_CHANGED)
+      local predictedListener=frames[before+4]
+      assert(predictedListener.events.UNIT_HEAL_PREDICTION and predictedListener.events.UNIT_ABSORB_AMOUNT_CHANGED)
       health=40
-      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","target")
+      emit("UNIT_HEALTH","target")
       assert(not predictedFrame.shown and healReads == 0)
-      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(predictedFrame.shown and predictedFrame.value == 40 and predictedFrame.clipsChildren)
       assert(healFrame.value == 300 and shieldFrame.value == 200 and healFrame.max == maxHealth)
       assert(healFrame.fillTexture == "heal-path" and shieldFrame.fillTexture == "shield-path")
       assert(healFrame.relative == predictedFrame.fill and healFrame.relativeAnchor == "TOPRIGHT")
       assert(shieldFrame.parent == predictedFrame and shieldFrame.reverse)
       incoming,shield={secret=true},{secret=true}
-      predictedFrame.onEvent(predictedFrame,"UNIT_HEAL_PREDICTION","player")
+      emit("UNIT_HEAL_PREDICTION","player")
       assert(healFrame.value == incoming and shieldFrame.value == shield)
       assert(not pcall(function() return predictedHP.HealPrediction.Value end))
       local priorConditions,priorHealReads=conditionCalls,healReads
       health={secret=true}
-      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(not predictedFrame.shown and conditionCalls == priorConditions and healReads == priorHealReads)
       health=110
-      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(not predictedFrame.shown and healReads == priorHealReads) -- chained conditions are AND
       health,incoming,shield=25,0,0
-      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(predictedFrame.shown and healFrame.value == 0 and shieldFrame.value == 0)
       assert(predictedHP.Value == 25 and predictedHP.HealPrediction.Value == 0)
       API.Unmount(nil,predictedFrame)
       assert(predictedFrame.onEvent == nil and next(predictedFrame.events) == nil and not healFrame.shown)
       local hiddenHP=new(HP):When(function() return true end)
       local hiddenFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=hiddenHP,visible=function() return false end}))
-      hiddenFrame.onEvent(hiddenFrame,"UNIT_HEALTH","player")
+      emit("UNIT_HEALTH","player")
       assert(not hiddenFrame.shown) -- source activation must not override a cell predicate
       API.Unmount(nil,hiddenFrame)
       local onlyHeal=new(HP):UseHealPrediction()
@@ -684,7 +846,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(not unsupportedHP.HealPrediction.IsAvailable and not unsupportedHP.AbsorbPrediction.IsAvailable)
       local unsupportedCount=#frames
       local unsupportedFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=unsupportedHP}))
-      assert(#frames == unsupportedCount+1 and unsupportedFrame.shown)
+      assert(#frames == unsupportedCount+2 and unsupportedFrame.shown)
       assert(not unsupportedFrame.events.UNIT_HEAL_PREDICTION and not unsupportedFrame.events.UNIT_ABSORB_AMOUNT_CHANGED)
       API.Unmount(nil,unsupportedFrame)
       UnitGetIncomingHeals,UnitGetTotalAbsorbs=unsupportedHeals,unsupportedAbsorbs
@@ -702,6 +864,606 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       conditionalTimer.onEvent(conditionalTimer,"SPELL_UPDATE_COOLDOWN")
       assert(not conditionalTimer.shown and restrictedCalls == restrictedCount)
       API.Unmount(nil,conditionalTimer)
+      -- A resource shares one native listener across observers, bars, and its regen accessory.
+      do
+      local Mana=resources.Mana
+      mana,maxMana=100,250
+      local trackedMana=new(Mana,"player"):UseRegenTimer()
+      local changes,otherChanges=0,0
+      local nativeBefore=#nativeFrames
+      local unsubscribe=trackedMana:onChange(function(_,value) changes=changes+1; assert(value == mana) end)
+      local unsubscribeOther=trackedMana:onChange(function() otherChanges=otherChanges+1 end)
+      assert(#nativeFrames == nativeBefore+1)
+      local trackedEvents=nativeFrames[#nativeFrames]
+      local readsBefore=powerReads
+      mana=90
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(changes == 1 and otherChanges == 1 and powerReads == readsBefore+1)
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(changes == 1 and otherChanges == 1)
+      mana={secret=true}
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(changes == 1 and otherChanges == 1)
+      unsubscribe()
+      mana=80
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(changes == 1 and otherChanges == 2)
+      unsubscribeOther()
+      assert(next(trackedEvents.events) == nil)
+      local timers={}
+      C_Timer={NewTimer=function(delay,callback)
+        local timer={due=now+delay,callback=callback,cancelled=false}
+        function timer:Cancel() self.cancelled=true end
+        timers[#timers+1]=timer
+        return timer
+      end}
+      local function advance(time)
+        now=time
+        for _,timer in ipairs(timers) do
+          if not timer.cancelled and timer.due <= now then timer.cancelled=true; timer.callback() end
+        end
+      end
+      C_CurveUtil={CreateCurve=function()
+        local curve={points={}}
+        function curve:SetType(value) self.type=value end
+        function curve:AddPoint(x,y) self.points[#self.points+1]={x,y} end
+        return curve
+      end}
+      Enum.LuaCurveType={Step=1}
+      local spellCost=10
+      C_Spell={GetSpellPowerCost=function(id) assert(id == 635); return {{type=0,cost=spellCost}} end}
+      local resourceBar=API.Mount(nil,factory(nil,"progress",{width=220,height=14,source=trackedMana}))
+      local beforeTimer=#nativeFrames
+      local tickBar=API.Mount(nil,factory(nil,"progress",{width=218,height=2,source=trackedMana.RegenTimer}))
+      assert(#nativeFrames == beforeTimer+1 and not tickBar.shown and tickBar.onUpdate == nil)
+      now=100
+      emit("UNIT_SPELLCAST_SUCCEEDED","player","cast-id",635)
+      assert(trackedMana.RegenTimer.Phase == "fiveSecondRule" and tickBar.shown and tickBar.timer.duration == 5)
+      local initialStart,initialCalls=tickBar.timer.start,tickBar.timerCalls
+      spellCost=0
+      now=101
+      emit("UNIT_SPELLCAST_SUCCEEDED","player","cast-id",635)
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(tickBar.timer.start == initialStart and tickBar.timerCalls == initialCalls)
+      advance(105)
+      assert(trackedMana.RegenTimer.Phase == "estimatedTick" and tickBar.timer.start == 105 and tickBar.timer.duration == 2)
+      now=106
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      advance(107)
+      assert(trackedMana.RegenTimer.Phase == "estimatedTick" and tickBar.timer.start == 107)
+      advance(109)
+      assert(not trackedMana.RegenTimer.IsActive and not tickBar.shown)
+      mana=maxMana
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(not tickBar.shown)
+      mana,spellCost=70,10
+      emit("UNIT_SPELLCAST_SUCCEEDED","player","cast-id",635)
+      assert(tickBar.shown and tickBar.timer.duration == 5)
+      mana=maxMana
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(not tickBar.shown and not trackedMana.RegenTimer.IsActive and timers[#timers].cancelled)
+      mana,spellCost={secret=true},{secret=true}
+      nativeManaAlpha=0
+      emit("UNIT_SPELLCAST_SUCCEEDED","player","cast-id",635)
+      assert(tickBar.shown and tickBar.alpha == 0) -- Native alpha masks full secret mana.
+      nativeManaAlpha=1
+      emit("UNIT_POWER_UPDATE","player","MANA")
+      assert(tickBar.alpha == 1)
+      API.Unmount(nil,tickBar)
+      assert(timers[#timers].cancelled and not trackedMana.RegenTimer.IsActive)
+      assert(trackedEvents.events.UNIT_POWER_UPDATE) -- The mana bar still consumes the source.
+      API.Unmount(nil,resourceBar)
+      assert(next(trackedEvents.events) == nil and trackedEvents.onEvent == nil)
+      local anchorView=factory(nil,"cell",{width=220,height=14},factory(nil,"progress",{
+        width="inherit",height=2,anchor="BOTTOMLEFT",relativeAnchor="BOTTOMLEFT",offset={x=0,y=1}}))
+      local anchorFrame=API.Mount(nil,anchorView)
+      local anchorChild=frames[#frames]
+      assert(anchorChild.anchor == "BOTTOMLEFT" and anchorChild.relative == anchorFrame and anchorChild.y == -1)
+      API.Unmount(nil,anchorFrame)
+      end
+      -- Stock action removal is explicit, backed up before mutation, and rejects unsafe restores.
+      do
+      local actionAPI=__wuiraModules.require("platform.ActionBars").ActionBars
+      local slots={[1]={"spell",635},[2]={"item",5512},[72]={"macro",1}}
+      local cursor
+      local pickups=0
+      function GetActionInfo(slot) local entry=slots[slot]; if entry then return entry[1],entry[2],entry[3] end end
+      function GetCursorInfo() if cursor then return cursor[1],cursor[2] end end
+      function PickupAction(slot) pickups=pickups+1; cursor=slots[slot]; slots[slot]=nil; emit("CURSOR_CHANGED") end
+      function ClearCursor() cursor=nil end
+      function PlaceAction(slot) assert(cursor); slots[slot]=cursor; cursor=nil end
+      function PickupSpell(id) cursor={"spell",id} end
+      function PickupItem(id) cursor={"item",id} end
+      function PickupMacro(id) cursor={"macro",id} end
+      combat=false
+      local backup=actionAPI.Capture(actionAPI)
+      assert(#backup == 3 and pickups == 0)
+      slots[3]={"flyout",9}
+      assert(not pcall(actionAPI.Capture,actionAPI) and pickups == 0 and slots[1])
+      slots[3]={"spell",17}
+      assert(not pcall(actionAPI.Clear,actionAPI,backup) and pickups == 0 and slots[1])
+      slots[3]=nil
+      combat=true
+      assert(not pcall(actionAPI.Clear,actionAPI,backup) and pickups == 0)
+      combat=false
+      cursor={"item",99}
+      assert(not pcall(actionAPI.Clear,actionAPI,backup) and pickups == 0)
+      cursor=nil
+      actionAPI.Clear(actionAPI,backup)
+      assert(next(slots) == nil and cursor == nil and pickups == 3)
+      slots[2]={"item",999}
+      assert(not pcall(actionAPI.Restore,actionAPI,backup) and slots[1] == nil and slots[2][2] == 999)
+      slots[2]=nil
+      actionAPI.Restore(actionAPI,backup)
+      assert(slots[1][2] == 635 and slots[2][2] == 5512 and slots[72][2] == 1 and cursor == nil)
+      local previousConsole=console
+      local errors,reloads=0,0
+      console={log=function() end,warn=function() end,error=function() errors=errors+1 end}
+      SlashCmdList={}
+      function ReloadUI() reloads=reloads+1 end
+      local controller=CreateFrame("Frame",nil,UIParent)
+      ActionBarController=controller
+      ActionBarButtonEventsFrame=CreateFrame("Frame",nil,UIParent)
+      ActionBarButtonEventsFrame:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
+      controller:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+      controller:SetScript("OnUpdate",function() end)
+      local nativeChild=CreateFrame("Frame",nil,MainMenuBar)
+      ActionButton1=nativeChild
+      local detached=0
+      C_ActionBar={UnregisterActionUIButton=function(button) assert(button == nativeChild); detached=detached+1 end}
+      nativeChild:RegisterEvent("ACTIONBAR_UPDATE_STATE")
+      nativeChild:SetScript("OnUpdate",function() end)
+      function MainMenuBar:GetChildren() return nativeChild end
+      local emptyOptions={addon="ActionTest",variable="WuiraActionTest",clearCommand="/cleartestbars",restoreCommand="/restoretestbars"}
+      local hardware=false
+      function PickupAction(slot)
+        assert(hardware,"PickupAction requires user input")
+        pickups=pickups+1; cursor=slots[slot]; slots[slot]=nil; emit("CURSOR_CHANGED")
+      end
+      C_AddOns={IsAddOnLoaded=function() return true end}
+      local stopFirst=actionAPI.InstallEmptyMode(actionAPI,emptyOptions)
+      emit("PLAYER_ENTERING_WORLD")
+      assert(reloads == 0 and slots[1] and errors == 0) -- Events never mutate slots or reload.
+      assert(WuiraActionTest["wuira.native-action-bars"].phase == "ready")
+      SlashCmdList.WUIRA_CLEAR_ACTIONTEST("") -- A new backup must survive reload first.
+      assert(slots[1] and errors == 0)
+      stopFirst()
+      local stopSecond=actionAPI.InstallEmptyMode(actionAPI,emptyOptions)
+      emit("PLAYER_ENTERING_WORLD")
+      assert(slots[1] and errors == 0 and reloads == 0)
+      assert(next(controller.events) == nil and controller.onEvent == nil and controller.onUpdate == nil)
+      assert(next(nativeChild.events) == nil and nativeChild.onUpdate == nil)
+      assert(next(ActionBarButtonEventsFrame.events) == nil)
+      assert(detached > 0)
+      assert(MainMenuBar:GetParent() ~= UIParent)
+      SlashCmdList.WUIRA_CLEAR_ACTIONTEST("") -- Simulate a refused native call.
+      assert(slots[1] and errors == 1 and MainMenuBar:GetParent() ~= UIParent)
+      emit("CURSOR_CHANGED")
+      emit("PLAYER_REGEN_ENABLED")
+      assert(errors == 1) -- A blocked operation is never retried by later events.
+      emit("ADDON_ACTION_BLOCKED","ActionTest","PickupAction()")
+      assert(errors == 2)
+      hardware=true
+      SlashCmdList.WUIRA_CLEAR_ACTIONTEST("")
+      hardware=false
+      assert(next(slots) == nil and errors == 2)
+      assert(WuiraActionTest["wuira.native-action-bars"].phase == "disabled")
+      hardware=true
+      SlashCmdList.WUIRA_RESTORE_ACTIONTEST("")
+      hardware=false
+      assert(reloads == 0 and WuiraActionTest["wuira.native-action-bars"].phase == "restored")
+      stopSecond()
+      local stopRestored=actionAPI.InstallEmptyMode(actionAPI,emptyOptions)
+      emit("PLAYER_ENTERING_WORLD")
+      assert(slots[1][2] == 635 and slots[2][2] == 5512 and errors == 2)
+      assert(WuiraActionTest["wuira.native-action-bars"].phase == "restored")
+      stopRestored()
+      console=previousConsole
+      end
+      -- Secure buttons use native attributes, preserve template clicks and respect combat ownership.
+      do
+      local function verifySecureButtons()
+      local originalCreateFrame=CreateFrame
+      local templateClick=function() end
+      local originalParentProtection=UIParent.IsProtected
+      function UIParent:IsProtected() return true end
+      function CreateFrame(kind,name,parent,template)
+        local frame=originalCreateFrame(kind,name,parent,template)
+        function frame:IsProtected()
+          return self.protected or (self.parent and self.parent ~= UIParent and self.parent.IsProtected and self.parent:IsProtected()) or false
+        end
+        local show,hide=frame.Show,frame.Hide
+        function frame:Show() assert(not combat or not self:IsProtected()); show(self) end
+        function frame:Hide() assert(not combat or not self:IsProtected()); hide(self) end
+        if kind == "Button" then
+          assert(template == "SecureActionButtonTemplate")
+          frame.protected,frame.attributes,frame.onClick=true,{},templateClick
+          local ancestor=parent
+          while ancestor and ancestor ~= UIParent do ancestor.protected=true; ancestor=ancestor.parent end
+          function frame:RegisterForClicks(click) assert(not combat); self.click=click end
+          function frame:SetAttribute(key,value) assert(not combat); self.attributes[key]=value end
+          function frame:SetID(id) assert(not combat); self.id=id end
+        end
+        return frame
+      end
+      combat=false
+      local visible=true
+      local before=#frames
+      local secureView=factory(nil,"cell",{width=100,height=40,visible=function() return visible end},
+        factory(nil,"secureButton",{action={type="spell",spell=635,unit="player"}},
+          factory(nil,"label",{text="Heal"})))
+      local root=API.Mount(nil,secureView)
+      local button,label=frames[before+2],frames[before+3]
+      local driver=frames[#frames]
+      assert(button.kind == "Button" and button.template == "SecureActionButtonTemplate" and button.mouseEnabled)
+      assert(button.width == 100 and button.height == 40 and label.parent == button and not label.mouseEnabled)
+      assert(button.click == "LeftButtonUp" and button.id == 0 and button.attributes.useOnKeyDown == false)
+      assert(button.attributes.type1 == "spell" and button.attributes.spell1 == 635 and button.attributes.unit1 == "player")
+      assert(button.attributes.type2 == nil and button.onClick == templateClick)
+      combat=true
+      local count=#frames
+      assert(not pcall(API.Mount,nil,factory(nil,"secureButton",{width=10,height=10})))
+      assert(not pcall(API.Mount,nil,factory(nil,"cell",{width=10,height=10}),nil,button))
+      assert(#frames == count) -- Preflight rejects the entire tree before creating any frames.
+      local ordinary=API.Mount(nil,factory(nil,"cell",{width=10,height=10}))
+      API.Unmount(nil,ordinary) -- A protected UIParent does not freeze ordinary UI in combat.
+      visible=false
+      driver.onUpdate(driver,.1)
+      assert(root.shown and button.shown) -- Ordinary ancestors are protected too.
+      secureView.child.props.action.spell=17
+      assert(button.attributes.spell1 == 635) -- Mutating props cannot rewrite secure actions.
+      combat=false
+      emit("PLAYER_REGEN_ENABLED")
+      assert(not root.shown)
+      visible=true
+      driver.onUpdate(driver,.1)
+      assert(root.shown)
+      combat=true
+      API.Unmount(nil,root)
+      assert(root.shown and button.attributes.type1 == "spell")
+      combat=false
+      emit("PLAYER_REGEN_ENABLED")
+      assert(not root.shown and not button.shown and not button.mouseEnabled and button.attributes.type1 == nil)
+      assert(button.onClick == templateClick)
+      assert(next(frames[before+4].events) == nil)
+      local cases={
+        {{type="item",item=5512},"item2","item:5512"},
+        {{type="macro",macro="My Utility"},"macro2","My Utility"},
+        {{type="action",slot=25},"action2",25},
+        {{type="target",unit="focus"},"unit2","focus"},
+      }
+      for _,case in ipairs(cases) do
+        local frame=API.Mount(nil,factory(nil,"secureButton",{width=20,height=20,button="RightButton",action=case[1]}))
+        assert(frame.attributes.type2 == case[1].type and frame.attributes[case[2]] == case[3])
+        assert(frame.attributes.type1 == nil and frame.click == "RightButtonUp")
+        API.Unmount(nil,frame)
+      end
+      local count=#frames
+      for _,invalid in ipairs({{type="spell",spell=0},{type="action",slot=-1},{type="target"},{type="macro",macro=""},{type="spell",spell={secret=true}}}) do
+        assert(not pcall(API.Mount,nil,factory(nil,"secureButton",{width=10,height=10,action=invalid})))
+      end
+      assert(not pcall(API.Mount,nil,factory(nil,"secureButton",{width=10,height=10,clickThrough=true})))
+      assert(#frames == count)
+      local inert=API.Mount(nil,factory(nil,"secureButton",{width=10,height=10}))
+      assert(inert.attributes.type1 == nil and inert.mouseEnabled)
+      API.Unmount(nil,inert)
+      local lateVisible=true
+      local host=API.Mount(nil,factory(nil,"cell",{width=40,height=40,visible=function() return lateVisible end}))
+      local hostDriver=frames[#frames]
+      local lateButton=API.Mount(nil,factory(nil,"secureButton",{width=20,height=20}),nil,host)
+      combat=true
+      lateVisible=false
+      hostDriver.onUpdate(hostDriver,.1)
+      assert(host.shown) -- A later, separately mounted secure child protects its existing host.
+      API.Unmount(nil,host)
+      API.Unmount(nil,lateButton)
+      combat=false
+      emit("PLAYER_REGEN_ENABLED")
+      assert(not host.shown and not lateButton.shown)
+      local oldSpell,oldOverride,oldClear=C_Spell,SetOverrideBindingClick,ClearOverrideBindings
+      local opaqueCooldown={secret=true}
+      C_Spell={
+        GetSpellName=function(id) assert(id == 679); return "Holy Strike" end,
+        GetSpellTexture=function(id) assert(id == 679); return 12345 end,
+        GetSpellCooldownDuration=function(identifier,ignoreGCD)
+          assert(identifier == "Holy Strike" and ignoreGCD == true)
+          return opaqueCooldown
+        end,
+      }
+      function SetOverrideBindingClick(owner,priority,key,name,button)
+        assert(not combat and not priority and _G[name] == owner)
+        owner.override={key=key,name=name,button=button}
+      end
+      function ClearOverrideBindings(owner) assert(not combat); owner.override=nil end
+      local spellClass=__wuiraModules.require("datasources.SpellSource").SpellSource
+      local spell=construct(spellClass,679)
+      local opacity=1
+      local count=#frames
+      local action=API.Mount(nil,factory(nil,"secureButton",{width=40,height=40,
+        action=spell.Action,binding="2",cooldown=spell.Cooldown,finishGlow=true,alpha=function() return opacity end},
+        factory(nil,"icon",{textureSource=spell.Texture,margin=1})))
+      local opacityDriver=frames[#frames]
+      local radial,hotkey
+      for index=count+1,#frames do
+        local candidate=frames[index]
+        if candidate.kind == "Cooldown" then radial=candidate end
+        if candidate.fontString and candidate.fontString.text == "2" then hotkey=candidate end
+      end
+      assert(action.attributes.spell1 == "Holy Strike" and action.override.key == "2")
+      assert(action.override.button == "LeftButton" and action.onClick == templateClick)
+      assert(radial and radial.cooldownDuration == opaqueCooldown and radial.drawBling and radial.drawSwipe)
+      assert(not radial.hideNumbers and radial.clearIfZero and radial.fontString.size == 13)
+      assert(hotkey and hotkey.frameLevel > radial.frameLevel)
+      assert(frames[count+2].texture.path == 12345)
+      combat=true
+      opacity=.4
+      opacityDriver.onUpdate(opacityDriver,.05)
+      assert(action.alpha == .4 and action.attributes.type1 == "spell" and action.override.key == "2")
+      opacity={secret=true}
+      opacityDriver.onUpdate(opacityDriver,.05)
+      assert(action.alpha == .4) -- Restricted opacity never enters Lua comparisons.
+      opacity=1
+      opacityDriver.onUpdate(opacityDriver,.05)
+      assert(action.alpha == 1)
+      opaqueCooldown={secret=true}
+      emit("SPELL_UPDATE_COOLDOWN")
+      assert(radial.cooldownDuration == opaqueCooldown and action.override.key == "2")
+      API.Unmount(nil,action)
+      assert(action.override ~= nil) -- Protected bindings remain intact until combat ends.
+      combat=false
+      emit("PLAYER_REGEN_ENABLED")
+      assert(action.override == nil and not radial.drawBling and radial.cooldownDuration == nil)
+      C_Spell,SetOverrideBindingClick,ClearOverrideBindings=oldSpell,oldOverride,oldClear
+      UIParent.IsProtected=originalParentProtection
+      CreateFrame=originalCreateFrame
+      end
+      verifySecureButtons()
+      end
+      -- Generic hover controls caller-owned content without menu-specific positioning.
+      do
+      local function verifyCommands()
+        local previousSlash,previousHash,previousChat,previousSecure=SlashCmdList,hash_SlashCmdList,hash_ChatTypeInfoList,IsSecureCmd
+        SlashCmdList={}; hash_SlashCmdList={}; hash_ChatTypeInfoList={}
+        function IsSecureCmd(command) return command == "/RELOAD" end
+        local value,calls=nil,0
+        local stop=API.registerCommand(nil,"/WuiraTest",function(...) value={...}; calls=calls+1 end)
+        local id,handler=next(SlashCmdList)
+        assert(_G["SLASH_"..id.."1"] == "/wuiratest")
+        handler("Keep Case and  spacing")
+        assert(#value == 4 and value[1] == "Keep" and value[2] == "Case" and value[3] == "and" and value[4] == "spacing" and calls == 1)
+        handler(""); assert(#value == 0 and calls == 2)
+        handler("  "..string.char(9).."  "); assert(#value == 0 and calls == 3)
+        handler([[one "two words" 'Three Words' "" pre"fixed value"post Türkçe]])
+        assert(#value == 6 and value[1] == "one" and value[2] == "two words" and value[3] == "Three Words" and value[4] == "" and value[5] == "prefixed valuepost" and value[6] == "Türkçe")
+        local slash=string.char(92)
+        handler('"say '..slash..'"hello'..slash..'"" "a'..slash..slash..'b" C:'..slash..'Temp')
+        assert(#value == 3 and value[1] == 'say "hello"' and value[2] == 'a'..slash..'b' and value[3] == 'C:'..slash..'Temp' and calls == 5)
+        assert(not pcall(handler,[["unclosed]])); assert(calls == 5)
+        assert(not pcall(API.registerCommand,nil,"/WUIRATEST",function() end))
+        assert(not pcall(API.registerCommand,nil,"/reload",function() end))
+        for _,invalid in ipairs({"", "test", "/", "//test", "/test sub", "/test"..string.char(10).."other"}) do
+          assert(not pcall(API.registerCommand,nil,invalid,function() end))
+        end
+        assert(not pcall(API.registerCommand,nil,"/invalidcallback",123))
+        -- Model Forever's import: the raw table is wiped and handlers move into its proxy.
+        local proxy={[id]=handler}
+        setmetatable(SlashCmdList,{__index=proxy})
+        rawset(SlashCmdList,id,nil)
+        hash_SlashCmdList["/WUIRATEST"]=handler
+        hash_ChatTypeInfoList["/WUIRATEST"]=id
+        stop(); stop()
+        assert(_G["SLASH_"..id.."1"] == nil and SlashCmdList[id] == nil and proxy[id] == nil)
+        assert(hash_SlashCmdList["/WUIRATEST"] == nil and hash_ChatTypeInfoList["/WUIRATEST"] == nil)
+        handler("stale callback"); assert(calls == 5)
+        local replacement=API.registerCommand(nil,"/wuiratest",function() end)
+        stop() -- Old cleanup must not remove a new registration with the same alias.
+        local newId,newHandler=next(SlashCmdList)
+        assert(newId ~= id and _G["SLASH_"..newId.."1"] == "/wuiratest")
+        local other=function() end
+        hash_SlashCmdList["/WUIRATEST"]=other
+        hash_ChatTypeInfoList["/WUIRATEST"]="OTHER"
+        replacement()
+        assert(hash_SlashCmdList["/WUIRATEST"] == other and hash_ChatTypeInfoList["/WUIRATEST"] == "OTHER")
+        hash_SlashCmdList["/WUIRATEST"]=nil; hash_ChatTypeInfoList["/WUIRATEST"]=nil
+        _G.SLASH_EXISTING_ADDON1="/existing-addon"
+        assert(not pcall(API.registerCommand,nil,"/existing-addon",function() end))
+        _G.SLASH_EXISTING_ADDON1=nil
+        local first=API.registerCommand(nil,"/wuira-one",function() end)
+        local oldSequence=_G.__wuiraCommandSequence
+        _G.__wuiraCommandSequence=0 -- Another embedded copy must still avoid existing IDs.
+        local second=API.registerCommand(nil,"/wuira-two",function() end)
+        local count=0; for _ in pairs(SlashCmdList) do count=count+1 end
+        assert(count == 2)
+        first(); second()
+        _G.__wuiraCommandSequence=oldSequence
+        SlashCmdList,hash_SlashCmdList,hash_ChatTypeInfoList,IsSecureCmd=previousSlash,previousHash,previousChat,previousSecure
+      end
+      verifyCommands()
+      end
+      do
+      local function verifyEditors()
+        local oldCenter=UIParent.GetCenter
+        function UIParent:GetCenter() return 0,0 end
+        combat=false
+        local clicks,cleanups=0,0
+        local control=API.Mount(nil,factory(nil,"button",{width=100,height=30,
+          onClick=function() clicks=clicks+1 end,
+          onMount=function(_,frame)
+            assert(frame.width == 100 and frame.mouseEnabled)
+            return function() cleanups=cleanups+1 end
+          end}))
+        assert(control.kind == "Button" and control.template == nil)
+        control.scripts.OnClick(control)
+        assert(clicks == 1)
+        API.Unmount(nil,control); API.Unmount(nil,control)
+        assert(cleanups == 1 and control.scripts.OnClick == nil)
+        local target=CreateFrame("Frame",nil,UIParent)
+        target:SetSize(100,40); target:SetPoint("CENTER",UIParent,"CENTER",10,-20)
+        local originalPoint=target.SetPoint
+        function target:SetPoint(...) assert(not combat,"Protected target moved during combat"); originalPoint(self,...) end
+        local saved
+        local moverClass=__wuiraModules.require("ui.FrameMover").FrameMover
+        local mover=new(moverClass,target,{label="Test",onMove=function(_,position) saved=position end})
+        local proxy=mover.Frame
+        assert(proxy.parent == UIParent and proxy.relative == UIParent and proxy.shown)
+        proxy.scripts.OnDragStart(proxy)
+        proxy.x,proxy.y=50,-30
+        proxy.onUpdate(proxy,.016)
+        assert(target.x == 50 and target.y == -30)
+        proxy.scripts.OnDragStop(proxy)
+        assert(saved.x == 50 and saved.y == 30 and not proxy.moving and proxy.onUpdate == nil)
+        proxy.scripts.OnDragStart(proxy)
+        proxy.x,proxy.y=80,-40
+        proxy.onUpdate(proxy,.016)
+        combat=true
+        emit("PLAYER_REGEN_DISABLED")
+        assert(not proxy.shown and not proxy.mouseEnabled and target.x == 80 and saved.x == 80)
+        assert(next(proxy.events) == nil)
+        combat=false
+        local oldShift,oldControl,oldAlt=IsShiftKeyDown,IsControlKeyDown,IsAltKeyDown
+        function IsShiftKeyDown() return true end
+        function IsControlKeyDown() return true end
+        function IsAltKeyDown() return false end
+        local captureClass=__wuiraModules.require("ui.KeybindCapture").KeybindCapture
+        local capture,cancelled
+        capture=construct(captureClass,function() cancelled=true; capture:SetActive(false) end)
+        local keyboard=frames[#frames]
+        local binding,calls=nil,0
+        local stop=capture:AddTarget(target,function(_,key)
+          calls=calls+1; binding=key
+          capture:SetActive(true) -- Model a synchronous action-tree rebuild.
+        end)
+        local overlay=frames[#frames]
+        assert(not overlay.shown and overlay.relative == UIParent)
+        capture:SetActive(true)
+        assert(overlay.shown and keyboard.keyboard)
+        overlay.scripts.OnEnter(overlay)
+        keyboard.scripts.OnKeyDown(keyboard,"K")
+        assert(binding == "CTRL-SHIFT-K" and calls == 1 and not keyboard.propagate)
+        overlay.scripts.OnEnter(overlay)
+        keyboard.scripts.OnKeyDown(keyboard,"DELETE")
+        assert(binding == nil and calls == 2 and not keyboard.propagate)
+        keyboard.scripts.OnKeyDown(keyboard,"ESCAPE")
+        assert(cancelled and not keyboard.keyboard and not overlay.shown)
+        capture:SetActive(true)
+        combat=true
+        emit("PLAYER_REGEN_DISABLED")
+        assert(not keyboard.keyboard and not overlay.shown)
+        combat=false
+        stop(); capture:Dispose()
+        assert(overlay.scripts.OnEnter == nil and keyboard.scripts.OnKeyDown == nil)
+        IsShiftKeyDown,IsControlKeyDown,IsAltKeyDown=oldShift,oldControl,oldAlt
+        local oldSettings,oldPanel=Settings,SettingsPanel
+        local category={GetID=function() return 42 end}
+        local registered,opened
+        Settings={
+          RegisterCanvasLayoutCategory=function(frame,name) assert(name == "Test settings"); return category end,
+          RegisterAddOnCategory=function(value) registered=value end,
+          OpenToCategory=function(id) opened=id end,
+        }
+        SettingsPanel=CreateFrame("Frame",nil,UIParent); SettingsPanel:Show()
+        local settingsClass=__wuiraModules.require("platform.AddonSettings").AddonSettings
+        local settings=new(settingsClass,"Test settings",factory(nil,"cell",{width=100,height=100}))
+        assert(registered == category and not settings.Frame.shown)
+        settings:Open(); assert(opened == 42)
+        settings:Close(); assert(not SettingsPanel.shown)
+        Settings,SettingsPanel=oldSettings,oldPanel
+        UIParent.GetCenter=oldCenter
+      end
+      verifyEditors()
+      end
+      do
+      local originalCreateFrame=CreateFrame
+      local secureContext=false
+      local function runSnippet(frame,body)
+        local previous=secureContext
+        secureContext=true
+        assert(load("return function(self) "..body.." end"))()(frame)
+        secureContext=previous
+      end
+      function CreateFrame(...)
+        local frame=originalCreateFrame(...)
+        frame.attributes,frame.refs,frame.hooks={},{},{}
+        function frame:SetFrameStrata(strata) self.strata=strata end
+        function frame:SetFrameRef(name,target) self.refs[name]=target end
+        function frame:GetFrameRef(name) return self.refs[name] end
+        function frame:SetAttribute(name,value) self.attributes[name]=value end
+        function frame:GetAttribute(name) return self.attributes[name] end
+        function frame:HookScript(name,callback) self.hooks[name]=callback end
+        function frame:GetChildren() end
+        function frame:RegisterAutoHide(delay) self.autoHideDelay=delay; self.autoHideFrames={} end
+        function frame:AddToAutoHide(target) self.autoHideFrames[target]=true end
+        function frame:Show()
+          assert(not combat or secureContext,"Protected popup Show outside secure handler")
+          self.shown=true
+          if self.attributes._onshow then runSnippet(self,self.attributes._onshow) end
+        end
+        function frame:Hide()
+          assert(not combat or secureContext,"Protected popup Hide outside secure handler")
+          self.shown=false
+        end
+        return frame
+      end
+      combat=false
+      local menu=CreateFrame("Frame",nil,UIParent)
+      menu:SetSize(260,40)
+      function menu:GetScale() return 1 end
+      function menu:GetNumPoints() return 1 end
+      function menu:GetPoint() return "BOTTOMRIGHT",UIParent,"BOTTOMRIGHT",-20,10 end
+      menu:RegisterEvent("UPDATE_BINDINGS")
+      local click=function() end
+      menu.nativeClick=click
+      local hover=__wuiraModules.require("ui.HoverTracker").HoverTracker
+      local tracker=construct(hover,{regions={menu},hideDelay=.25})
+      local handle,popup=tracker.Trigger,tracker.Popup
+      assert(menu.parent == UIParent and not popup.shown) -- No skin, layout, size or reparenting.
+      assert(handle.width == nil and popup.width == nil)
+      assert(menu.nativeClick == click and menu.events.UPDATE_BINDINGS)
+      combat=true
+      runSnippet(handle,handle.attributes._onenter)
+      assert(popup.shown and popup.autoHideDelay == .25)
+      assert(popup.autoHideFrames[handle] and popup.autoHideFrames[menu])
+      tracker:Dispose()
+      assert(popup.shown) -- Protected cleanup waits for combat to end.
+      combat=false
+      emit("PLAYER_REGEN_ENABLED")
+      assert(menu.parent == UIParent)
+      assert(not handle.shown and not popup.shown and menu.nativeClick == click and menu.events.UPDATE_BINDINGS)
+      local microClass=__wuiraModules.require("skins.MicroBar").MicroBar
+      local bar=construct(microClass)
+      MicroMenu=nil
+      local renders,hoverStates=0,{}
+      local mounted
+      bar:render(function(defaultBar)
+        assert(defaultBar == bar)
+        renders=renders+1
+        mounted=defaultBar:mount(factory(nil,"cell",{width=20,height=10}),"CENTER")
+        defaultBar:OnHover(function(value) hoverStates[#hoverStates+1]=value end)
+        return defaultBar
+      end)
+      assert(renders == 0) -- render waits for the native frame to exist.
+      local pointerInside=false
+      function menu:IsMouseOver() return pointerInside end
+      MicroMenu=menu
+      emit("ADDON_LOADED","Blizzard_MicroMenu")
+      assert(renders == 1 and mounted.parent == menu and mounted.anchor == "CENTER")
+      emit("PLAYER_ENTERING_WORLD")
+      assert(renders == 1 and menu.nativeClick == click and menu.events.UPDATE_BINDINGS)
+      pointerInside=true
+      menu.hooks.OnEnter()
+      menu.hooks.OnEnter()
+      pointerInside=false
+      menu.hooks.OnLeave()
+      assert(#hoverStates == 2 and hoverStates[1] and not hoverStates[2])
+      combat=true
+      bar:Dispose()
+      assert(mounted.shown) -- Skin cleanup also waits for protected children to be mutable.
+      combat=false
+      emit("PLAYER_REGEN_ENABLED")
+      assert(not mounted.shown and menu.nativeClick == click and menu.events.UPDATE_BINDINGS)
+      MicroMenu=nil
+      CreateFrame=originalCreateFrame
+      end
     `;
     const file = path.join(fixture, "verify.lua");
     fs.writeFileSync(file, script);

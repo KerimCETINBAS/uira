@@ -6,6 +6,8 @@ import type { ProgressSource } from "../../datasources/ProgressSource";
 import type { TimerSource } from "../../datasources/TimerSource";
 import type { LabelProps } from "../Label";
 import type { IconProps } from "../Icon";
+import type { SecureButtonProps } from "../SecureButton";
+import type { ButtonProps } from "../Button";
 
 /** Declarative UI description; native frames are created by mount. */
 export interface Element {
@@ -23,7 +25,7 @@ export namespace UI {
         return { kind: "empty", props: {} };
     }
     export function createElement<P extends object>(
-        component: Component<P> | "cell" | "flow" | "grid" | "progress" | "label" | "icon",
+        component: Component<P> | "cell" | "flow" | "grid" | "progress" | "label" | "icon" | "button" | "secureButton",
         props: P | undefined,
         ...children: (Element | Element[])[]
     ): Element {
@@ -75,6 +77,8 @@ export namespace UI {
             progress: Partial<ProgressBarProps> & { child?: Element };
             label: Partial<LabelProps>;
             icon: Partial<IconProps>;
+            secureButton: Partial<SecureButtonProps> & { child?: Element };
+            button: Partial<ButtonProps> & { child?: Element };
         }
     }
 }

@@ -142,6 +142,241 @@ overlays require the native health scale, so min/max/current overrides are rejec
 Prediction reads pause while the parent HP condition is inactive. The renderer
 cleans up the overlays and resource subscriptions on unmount.
 
+### Slash commands
+
+```ts
+import { wuira } from "wuira";
+
+const unregister = wuira.registerCommand("/myaddon", (...args: string[]) => {
+    console.log("Arguments:", ...args);
+});
+
+// /myaddon arg1 arg2 arg3 passes three string arguments.
+// /myaddon alone calls the callback with no arguments.
+// Call unregister() when the command is no longer needed.
+```
+
+Command names start with a slash and a letter, followed by letters, digits,
+underscores or hyphens. Names are case-insensitive and cannot replace an existing
+command. Register aliases separately with the same callback.
+
+Arguments are separated by whitespace and retain their case. Single or double
+quotes group words into one argument; `""` passes an empty string. Within quotes,
+a backslash can escape the matching quote or another backslash. An unclosed quote
+reports an error without calling the callback. Argument counts are unrestricted;
+validate required arguments inside your callback.
+
+### Addon settings and editing tools
+
+Register a normal JSX view in Forever's native addon settings list:
+
+```tsx
+import { UI, AddonSettings } from "wuira";
+import { FlowLayout, Button, Label } from "wuira/ui";
+
+const settings = new AddonSettings("MyAddon", () => (
+    <FlowLayout width={560} height={300} padding={20} gap={12}>
+        <Label height={28} text="MyAddon settings" />
+        <Button width={180} height={32} onClick={() => console.log("Settings opened")}>
+            <Label text="Example control" align="CENTER" />
+        </Button>
+    </FlowLayout>
+));
+settings.Open();
+```
+
+`Cell.onMount` receives the configured native frame and may return an unmount
+cleanup. `FrameMover` provides a drag proxy with screen-center coordinates
+(positive y down). `KeybindCapture` provides hover-to-bind overlays, modifier keys,
+Delete/Backspace clearing, and an Escape callback. These tools stop editing in
+combat. Addons own mode controls, saved positions, binding conflict policy and
+rebuilding protected buttons outside combat.
+
+### Learned spells
+
+`KnownSpells` keeps a cached snapshot of learned player spellbook IDs. It refreshes
+on world entry, level, training and talent events without polling. Named entries
+in `Spells` are numeric IDs; `Has` also matches a representative ID against learned
+ranks by localized name. Future and inactive-spec spellbook entries are excluded.
+
+```ts
+import { Spells } from "wuira";
+import { KnownSpells } from "wuira/datasources";
+
+const known = new KnownSpells();
+const spellIds = known.Value; // readonly number[], read from the cache
+const canJudge = known.Has(Spells.Judgement);
+const stop = known.onChange(ids => console.log("Learned spells:", ids.length));
+// On disposal: stop(); known.Dispose();
+```
+
+Protected button trees must be rebuilt outside combat; applications can defer a
+changed selection until `PLAYER_REGEN_ENABLED`. `Cell.alpha` changes appearance
+without changing a button's protected action or its interaction state.
+
+### Empty native action bars
+
+This is opt-in and removes real action-slot assignments, not just their visuals.
+Declare a character-specific backup variable in the addon's TOC:
+
+```text
+## SavedVariablesPerCharacter: MyAddonActionBarBackup
+```
+
+```ts
+import { ActionBars } from "wuira";
+
+ActionBars.InstallEmptyMode({
+    addon: "MyAddon",
+    variable: "MyAddonActionBarBackup",
+    clearCommand: "/myaddonclearbars",
+    restoreCommand: "/myaddonrestorebars",
+});
+```
+
+The first world entry captures supported spell, item, and macro assignments.
+Use `/reload` to persist a new backup, then `/myaddonclearbars` outside combat to
+clear the 180 action slots used by the installed Forever implementation. Slot
+changes run directly from the command, never from world-entry or cursor events.
+Independently, initialization hides stock bars, removes their descendant event/update handlers, disables their
+shared action-bar event managers, and detaches native action UI registrations.
+It does not create a replacement bar or remove key-binding assignments.
+Changes wait until combat ends, and a busy cursor blocks slot changes.
+
+The restore command puts assignments back into empty or identical slots. Use
+`/reload` afterwards to restore native handlers and visibility. The stock bars
+remain enabled on future loads. A refused slot operation leaves bar suppression
+active and is not automatically retried. Blocked/forbidden native calls report
+their API name in the local console; command execution does not bypass client restrictions.
+Unsupported action types, secret slot data, uncovered assignments, and conflicting
+restores stop the operation. `Capture()`, `Clear(backup)`, and `Restore(backup)` are
+also available for applications that manage their own persistence and lifecycle.
+
+### Secure action buttons
+
+`SecureButton` extends Cell's descriptor and props, including size, positioning,
+decorations and one child. Mount it like any other component:
+
+```tsx
+import { UI, wuira } from "wuira";
+import { SecureButton, Label } from "wuira/ui";
+
+wuira.Mount(() => (
+    <SecureButton width={80} height={24}
+        action={{ type: "spell", spell: 635, unit: "player" }}>
+        <Label text="Holy Light" align="CENTER" />
+    </SecureButton>
+));
+```
+
+Supported actions are `{ type: "spell", spell, unit? }`,
+`{ type: "item", item, unit? }`, `{ type: "macro", macro }`,
+`{ type: "action", slot, unit? }` and `{ type: "target", unit }`.
+Spell and macro references accept IDs/indices or names. Items accept an ID
+(converted to `item:ID`) or the native item string. Macros refer to existing
+game macros, not arbitrary Lua callbacks or generated macro text.
+
+The default is left-button release; `button="RightButton"` selects another
+button. Secure buttons always receive mouse input, while visual children remain
+click-through by default. Omitting `action` creates an inert secure button.
+
+Actions and units are static mount-time attributes. Changing the descriptor
+later does not rewrite them. Mounting a protected tree during combat raises an
+error before any frame is created. Visibility changes and unmount requests wait
+until combat ends, including changes to ancestors containing secure buttons.
+Click-cast presets are not provided by this primitive yet. The native action mapping
+follows [Forever's secure templates](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_FrameXML/SecureTemplates.lua).
+
+For an icon action with a radial cooldown and temporary key binding:
+
+```tsx
+import { Spells } from "wuira";
+import { SpellSource } from "wuira/datasources";
+import { Icon } from "wuira/ui";
+
+const judgement = new SpellSource(Spells.Judgement);
+const button = (
+    <SecureButton width={40} height={40} action={judgement.Action}
+        binding="1" cooldown={judgement.Cooldown} finishGlow>
+        <Icon textureSource={judgement.Texture} />
+    </SecureButton>
+);
+```
+
+`binding` temporarily routes the key to this native button and adds its label;
+`showHotkey={false}` suppresses the label. Unmount removes the override and leaves
+saved bindings intact. The radial widget owns countdown timing and the short
+completion flash, including opaque combat durations. `SpellSource.Cooldown`
+ignores the GCD so unrelated casts do not trigger a completion flash.
+
+### Native skins
+
+Skin Forever's existing character, professions, spellbook and other micro-menu
+buttons while keeping the game's click handlers, tooltips and notifications:
+
+```tsx
+import { UI } from "wuira";
+import { MicroBar } from "wuira/skins";
+import { Cell, Background } from "wuira/ui";
+
+const micro = new MicroBar();
+micro.render(bar => {
+    bar.Style({
+        background: { r: 0.035, g: 0.045, b: 0.065, a: 0.9 },
+        accent: { r: 0.4, g: 0.75, b: 1 },
+        padding: 6,
+    });
+    bar.mount(() => (
+        <Cell width={12} height={2} decorations={{
+            background: new Background({ color: { r: 0.4, g: 0.75, b: 1 } }),
+        }} />
+    ), "TOP");
+    bar.OnHover(hovered => console.log("Micro menu hover:", hovered));
+    return bar;
+});
+```
+
+`render` receives the skin adapter once its game-owned frame is ready. The same
+object exposes `Frame`, `Style`, `OnHover`, and `mount`; mounts become children of
+the native frame and are released by `Dispose()`. Native clicks, events and
+tooltips remain intact. Rendering waits until combat ends.
+
+`HoverTracker` supplies generic secure trigger/popup frames and auto-hide regions;
+the addon owns their visuals, contents and positioning. Compact menu launchers
+and themes belong in the consuming UI rather than the framework. Hover callbacks
+are ordinary addon callbacks; use secure hover visibility for protected panels.
+
+`BlizzardUI.SkinMicroMenu(options)` is also available for styling alone. Stopping
+styling hides its added panel; reload restores original native textures.
+
+### Resource observation and mana regen
+
+Resource changes can also be observed without mounting a widget:
+
+```ts
+const mana = new Mana(Unit.Player).UseRegenTimer();
+const unsubscribe = mana.onChange(value => console.log(value));
+// Call unsubscribe() when this consumer is removed.
+```
+
+`onChange` reports future readable value changes, with no initial callback.
+It honors `.When()` and never sends secret values to user code. Native bar
+bindings still accept secret values directly. Bars, observers, and the regen
+accessory share one lazy native event listener; it unregisters when the last
+consumer detaches. `.Value` is still available for a one-time read.
+
+`mana.RegenTimer` can be bound to a thin `ProgressBar`. Its `Phase` is
+`fiveSecondRule`, `estimatedTick`, or `inactive`. Successful mana-cost casts
+start/restart a five-second window, followed by estimated two-second cycles.
+Mana events keep those cycles alive without resetting a running cycle. No
+server tick clock is exposed: this is an estimate, including when the cost is
+secret. Zero-cost casts do not restart the window. The native widget animates
+the fill; one-shot callbacks handle phase transitions, with no Lua frame polling.
+Full readable mana cancels the clock. When mana is secret, a native step curve
+hides full mana visually; Lua cannot use that hidden result to dispose the timer,
+so the estimate stops when mana events cease. The frame is reused on the next
+cast. Configure this player-only accessory before mounting.
+
 ### Native aura, cooldown, and cast timers
 
 ```tsx
