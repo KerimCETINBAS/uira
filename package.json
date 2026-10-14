@@ -1,6 +1,6 @@
 {
   "name": "wuira",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "author": {
     "name": "Kerim Cetinbas",
     "email": "a.cetinbas@icloud.com"
@@ -28,6 +28,14 @@
       "types": "./lib/skins/index.d.ts",
       "default": "./lib/skins/index.lua"
     },
+    "./spells": {
+      "types": "./lib/spells/index.d.ts",
+      "default": "./lib/spells/index.lua"
+    },
+    "./spells/*": {
+      "types": "./lib/spells/*.d.ts",
+      "default": "./lib/spells/*.lua"
+    },
     "./console-polyfill": {
       "types": "./lib/console-polyfill.d.ts",
       "default": "./lib/console-polyfill.lua"
@@ -50,6 +58,12 @@
       "skins": [
         "lib/skins/index.d.ts"
       ],
+      "spells": [
+        "lib/spells/index.d.ts"
+      ],
+      "spells/*": [
+        "lib/spells/*"
+      ],
       "console-polyfill": [
         "lib/console-polyfill.d.ts"
       ]
@@ -61,6 +75,8 @@
     "tools/",
     "config/",
     "templates/",
+    "data/spells/forever.json",
+    "docs/spells.md",
     "tsconfig.json",
     "tsconfig.lib.json",
     "README.md",
@@ -79,6 +95,8 @@
     "prepack": "npm run build",
     "watch": "tstl -p tsconfig.json --watch",
     "check": "tsc -p tsconfig.json --noEmit",
+    "spells:update": "node tools/update-spells.mjs",
+    "spells:generate": "node tools/generate-spells.mjs",
     "test": "node --test tests/*.test.cjs"
   },
   "devDependencies": {

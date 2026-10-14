@@ -1,4 +1,4 @@
-/** Representative spell IDs; aura sources resolve localized names across ranks. */
+/** Legacy aliases. Prefer the generated class enums for build-pinned Forever IDs. */
 export enum Spells {
     Judgement = 20271,
     HolyStrike = 679,
@@ -14,6 +14,7 @@ export enum Spells {
     BlessingOfKings = 20217,
     BlessingOfLight = 19977,
     BlessingOfSalvation = 1038,
+    /** @deprecated Absent from Forever 1.60.1.70374; retained for source compatibility. */
     BlessingOfSanctuary = 20911,
     BlessingOfSacrifice = 6940,
     GreaterBlessingOfMight = 25782,
@@ -21,6 +22,7 @@ export enum Spells {
     GreaterBlessingOfKings = 25898,
     GreaterBlessingOfLight = 25890,
     GreaterBlessingOfSalvation = 25895,
+    /** @deprecated Absent from Forever 1.60.1.70374; retained for source compatibility. */
     GreaterBlessingOfSanctuary = 25899,
     DevotionAura = 465,
     RetributionAura = 7294,

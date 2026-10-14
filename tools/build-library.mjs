@@ -8,7 +8,7 @@ const result = spawnSync(process.execPath, [require.resolve("typescript-to-lua/d
 if (result.status !== 0) process.exit(result.status || 1);
 fs.mkdirSync(path.join(root, "lib/platform"), { recursive: true });
 fs.copyFileSync(path.join(root, "src/platform/forever.d.ts"), path.join(root, "lib/platform/forever.d.ts"));
-for (const file of ["index.d.ts", "ui/index.d.ts", "datasources/index.d.ts", "store/index.d.ts", "skins/index.d.ts"]) {
+for (const file of ["index.d.ts", "ui/index.d.ts", "datasources/index.d.ts", "store/index.d.ts", "skins/index.d.ts", "spells/index.d.ts"]) {
   const target = path.join(root, "lib", file);
   const reference = file === "index.d.ts" ? "./platform/forever.d.ts" : "../platform/forever.d.ts";
   fs.writeFileSync(target, `/// <reference path="${reference}" />\n` + fs.readFileSync(target, "utf8"));

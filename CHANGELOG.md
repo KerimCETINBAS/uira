@@ -7,6 +7,20 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.1.10 — 2026-10-15
+
+### Added
+
+- Generated, categorized compile-time spell enums covering all 31,863 IDs in
+  Forever client 1.60.1.70374, including racial, pet, profession and world records.
+- Separate native BindingActions command tokens, pinned source provenance and
+  offline enum regeneration from a committed client snapshot.
+
+### Fixed
+
+- Resolve root Store exports through an explicit index module and apply Node16
+  module resolution to the framework's own TypeScript project.
+
 ## 0.1.9 — 2026-10-15
 
 ### Added

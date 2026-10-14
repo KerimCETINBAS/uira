@@ -2,3 +2,4 @@ node_modules/
 dist/
 lib/
 wuira.toc
+data/spells/.cache/

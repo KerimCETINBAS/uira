@@ -4,6 +4,11 @@ export type { CommandCallback } from "./platform/SlashCommands";
 export { AddonSettings } from "./platform/AddonSettings";
 export { Encoding } from "./platform/Encoding";
 export { Spells } from "./Spells";
+export {
+    DruidSpells, GeneralSpells, HunterSpells, MageSpells, PaladinSpells, PetSpells,
+    PriestSpells, ProfessionSpells, RacialSpells, RogueSpells, ShamanSpells,
+    WarlockSpells, WarriorSpells, WorldSpells, BindingActions,
+} from "./spells/index";
 export { BlizzardUI } from "./platform/BlizzardUI";
 export { ActionBars } from "./platform/ActionBars";
 export type { ActionSlot, EmptyActionBarsOptions } from "./platform/ActionBars";
@@ -15,5 +20,5 @@ export type { HoverTrackerOptions, HoverFrame } from "./ui/HoverTracker";
 export { MicroBar } from "./skins/MicroBar";
 export type { Element, Component } from "./ui/primitives/jsx";
 export type { Cell } from "./ui/Cell";
-export { Store, StoreRegistry } from "./store";
-export type { StoreClass, ReadonlyData, SavedStoreOptions } from "./store";
+export { Store, StoreRegistry } from "./store/index";
+export type { StoreClass, ReadonlyData, SavedStoreOptions } from "./store/index";

@@ -34,7 +34,10 @@ test("CLI creates and builds a standalone empty-JSX addon", async () => {
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(result.stderr, "");
     fs.appendFileSync(path.join(project, "src/index.tsx"), `
-import { UI, Encoding } from "wuira";
+import { UI, Encoding, Store as RootStore, StoreRegistry as RootStoreRegistry } from "wuira";
+import { PaladinSpells, MageSpells, RacialSpells, GeneralSpells, BindingActions } from "wuira/spells";
+import { WarriorSpells } from "wuira/spells/WarriorSpells";
+const constantHeal = PaladinSpells.HolyLight;
 import { Cell, FlowLayout, ForEach, Window, ProgressBar, SecureButton, Button, FrameMover, KeybindCapture } from "wuira/ui";
 import { HP, Unit } from "wuira/datasources";
 import { SpellSource, KnownSpells } from "wuira/datasources";
@@ -44,6 +47,14 @@ import { Mana } from "wuira/datasources";
 const manaWithRegen = new Mana(Unit.Player).UseRegenTimer();
 if (manaWithRegen.RegenTimer === undefined) throw "Regen accessory missing";
 if (false) {
+    class MemorySettings extends RootStore { spellId = PaladinSpells.HolyLight; }
+    const snapshot = new RootStoreRegistry().get(MemorySettings);
+    const spellId: number = snapshot.spellId;
+    const fireball: number = MageSpells.Fireball;
+    const racial: number = RacialSpells.WillOfTheForsaken;
+    const attack: number = GeneralSpells.Attack;
+    const warrior: number = WarriorSpells.HeroicStrike;
+    const movement: string = BindingActions.MOVEFORWARD;
     const encoded: string = Encoding.Encode({ spellId: 635, enabled: true });
     const decoded: unknown = Encoding.Decode(encoded);
     // @ts-expect-error Decoded data requires application validation.
@@ -136,6 +147,11 @@ if (false) {
     fs.writeFileSync(path.join(project, "wuira.config.mjs"), `export default { name: "HelloAddon", outDir: ${JSON.stringify(external)} };`);
     await build(project);
     assert.ok(fs.existsSync(path.join(external, "HelloAddon.toc")));
+    const emitted = fs.readFileSync(path.join(external, "index.lua"), "utf8");
+    assert.match(emitted, /local constantHeal = 635/);
+    assert.doesNotMatch(emitted, /require\([^)]*spells/);
+    assert.doesNotMatch(fs.readFileSync(path.join(installed, "lib/index.lua"), "utf8"), /require\([^)]*spells/);
+    assert.doesNotMatch(fs.readFileSync(path.join(installed, "lib/spells/PaladinSpells.lua"), "utf8"), /HolyLight/);
     const newLoads = fs.readFileSync(path.join(external, "HelloAddon.toc"), "utf8").split(/\r?\n/)
       .filter(line => line && !line.startsWith("#"))
       .map(file => `dofile(${JSON.stringify(file.replace(/\\/g, "/"))})`);
