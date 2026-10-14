@@ -740,6 +740,13 @@ Cell is the basic visual box. FlowLayout and GridLayout arrange children. Progre
 
 Licensed under MIT; see [LICENSE](LICENSE).
 
+## AI disclosure
+
+wuira is developed with AI assistance for implementation, documentation, and
+tests. AI-assisted code is reviewed line by line. Releases also undergo
+TypeScript checks, Lua runtime tests, and package build validation. Project
+maintainers remain responsible for the code and release decisions.
+
 ## Releases
 
 See [CHANGELOG.md](CHANGELOG.md) for release history. Record new changes under

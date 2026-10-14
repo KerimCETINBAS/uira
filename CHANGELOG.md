@@ -7,6 +7,13 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.1.7 — 2026-10-14
+
+### Added
+
+- README AI disclosure describing AI assistance, line-by-line code review,
+  release validation, and maintainer responsibility.
+
 ## 0.1.6 — 2026-10-14
 
 ### Added
