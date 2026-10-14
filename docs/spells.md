@@ -26,10 +26,8 @@ Forever client's tables. Use KnownSpells for a character's learned abilities.
 
 Every ID has an explicit ID-suffixed member. Rank labels come from the client.
 Short aliases select the lowest linked rank; ambiguous unranked names require
-the explicit member. Existing Spells aliases remain compatible.
-The two historical Sanctuary aliases in that legacy enum are deprecated because
-their IDs do not occur in this snapshot; they are not added to the generated
-Forever catalog.
+the explicit member. The legacy Spells enum has been removed; import the
+appropriate categorized enum instead, such as PaladinSpells from wuira/spells.
 
 These are const enums: TypeScriptToLua replaces accesses with literal numbers,
 so the entire catalog is not allocated as Lua tables. They support static

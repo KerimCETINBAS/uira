@@ -22,10 +22,6 @@ test("Forever spell enums cover the entire pinned client snapshot without runtim
     assert.ok(catalog.sources.every(source => source.url.includes("build=" + catalog.build) && /^[a-f0-9]{64}$/.test(source.sha256)));
     assert.ok(catalog.bindings.actions.some(([name]) => name === "MOVEFORWARD"));
     assert.ok(catalog.bindings.actions.some(([name]) => name === "ATTACKTARGET"));
-    const legacy = fs.readFileSync(path.join(root, "src/Spells.ts"), "utf8");
-    const deprecatedLegacyIds = new Set([20911, 25899]);
-    for (const [, value] of legacy.matchAll(/=\s*(\d+)/g)) assert.ok(expected.has(Number(value)) || deprecatedLegacyIds.has(Number(value)), "unidentified legacy spell: " + value);
-    for (const id of deprecatedLegacyIds) assert.ok(!expected.has(id), "retired aliases must not be inserted into the verified catalog");
     const generated = fs.readdirSync(path.join(root, "src/spells")).map(name => [name, fs.readFileSync(path.join(root, "src/spells", name), "utf8")]);
     const result = spawnSync(process.execPath, ["tools/generate-spells.mjs"], { cwd: root, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);

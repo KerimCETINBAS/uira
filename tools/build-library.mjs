@@ -4,6 +4,10 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const root = path.resolve(import.meta.dirname, "..");
+// Discard previous build artifacts so deleted modules cannot enter the package.
+const output = path.join(root, "lib");
+if (path.dirname(output) !== root) throw new Error("Library output must remain inside the project");
+fs.rmSync(output, { recursive: true, force: true });
 const result = spawnSync(process.execPath, [require.resolve("typescript-to-lua/dist/tstl.js"), "-p", "tsconfig.lib.json"], { cwd: root, stdio: "inherit" });
 if (result.status !== 0) process.exit(result.status || 1);
 fs.mkdirSync(path.join(root, "lib/platform"), { recursive: true });

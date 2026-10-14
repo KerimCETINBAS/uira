@@ -7,6 +7,18 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.0 — 2026-10-15
+
+### Removed
+
+- **Breaking:** Remove the legacy Spells enum. Use the generated categorized
+  enums from wuira/spells, such as PaladinSpells, instead.
+
+### Fixed
+
+- Clean library output before compilation so removed modules are excluded from
+  published packages.
+
 ## 0.1.10 — 2026-10-15
 
 ### Added

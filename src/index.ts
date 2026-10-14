@@ -3,7 +3,6 @@ export { wuira } from "./wuira";
 export type { CommandCallback } from "./platform/SlashCommands";
 export { AddonSettings } from "./platform/AddonSettings";
 export { Encoding } from "./platform/Encoding";
-export { Spells } from "./Spells";
 export {
     DruidSpells, GeneralSpells, HunterSpells, MageSpells, PaladinSpells, PetSpells,
     PriestSpells, ProfessionSpells, RacialSpells, RogueSpells, ShamanSpells,
