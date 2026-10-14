@@ -44,6 +44,10 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         local frame = { kind = kind, parent = parent, template = template, textures = {} }
         function frame:SetMinMaxValues(min,max) self.min,self.max=min,max end
         function frame:SetValue(value) self.value=value end
+        function frame:SetTimerDuration(duration,interpolation,direction)
+          self.timer=duration; self.timerCalls=(self.timerCalls or 0)+1
+          assert(interpolation == 0 and direction == 1)
+        end
         function frame:SetStatusBarTexture(path) self.fillTexture=path end
         function frame:SetStatusBarColor(r,g,b,a) self.fillColor={r,g,b,a} end
         function frame:SetOrientation(orientation) self.orientation=orientation end
@@ -57,14 +61,30 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
           return self.fill
         end
         function frame:SetSize(w, h) self.width, self.height = w, h end
+        function frame:CreateFontString()
+          local text = {}
+          self.fontString=text
+          function text:SetAllPoints(parent) self.parent=parent end
+          function text:SetFont(font,size,flags) self.font,self.size=font,size; return true end
+          function text:SetJustifyH(align) self.align=align end
+          function text:SetJustifyV() end
+          function text:SetTextColor(...) self.color={...} end
+          function text:SetText(value) self.text=value end
+          return text
+        end
         function frame:EnableMouse(enabled) self.mouseEnabled = enabled end
         function frame:GetWidth() return self.width end
         function frame:GetHeight() return self.height end
         function frame:RegisterEvent(event) self.events = self.events or {}; self.events[event] = true end
         function frame:UnregisterAllEvents() self.events = {} end
-        function frame:SetScript(_, handler) self.onEvent = handler end
+        function frame:SetScript(script, handler)
+          if script == "OnUpdate" then self.onUpdate = handler else self.onEvent = handler end
+        end
+        function frame:SetClipsChildren(value) self.clipsChildren=value end
+        function frame:GetFrameLevel() return self.frameLevel or 0 end
+        function frame:SetFrameLevel(value) self.frameLevel=value end
         function frame:SetPoint(point, relative, relativePoint, x, y)
-          assert((point == "TOPLEFT" and relativePoint == "TOPLEFT") or (point == "CENTER" and relativePoint == "CENTER"))
+          assert(type(point) == "string" and type(relativePoint) == "string")
           self.anchor,self.relativeAnchor = point,relativePoint
           self.relative = relative
           self.x, self.y = x, y
@@ -93,6 +113,8 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         function frame:Show() self.shown = true end
         function frame:Hide() self.shown = false end
         function frame:SetParent(parent) self.parent = parent end
+        function frame:GetParent() return self.parent end
+        function frame:HookScript(script, handler) assert(script == "OnShow"); self.onShowHook=handler end
         function frame:ClearAllPoints() end
         function frame:SetAllPoints(parent) assert(parent == self.parent) end
         function frame:SetBackdrop(info) self.backdrop = info end
@@ -176,9 +198,9 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(not pcall(mount, nil, a))
       local ok = pcall(mount, nil, {kind="unknown"})
       assert(not ok)
-      local function new(class, props, children)
+      local function new(class, ...)
         local instance = setmetatable({}, class.prototype)
-        instance:____constructor(props, children)
+        instance:____constructor(...)
         return instance
       end
       local HP = __wuiraModules.require("datasources.Resources").HP
@@ -470,6 +492,216 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       local Collision = {Token="luma.settings",prototype=Memory.prototype}
       assert(not pcall(function() reloaded:get(Collision) end))
       registry:Dispose()
+      local swingAPI = __wuiraModules.require("datasources.SwingTimer")
+      local now = 10
+      function GetTime() return now end
+      C_SwingTimer = {}
+      Enum = {PlayerSwingType={MainHand=0,OffHand=1,Ranged=2},StatusBarInterpolation={Immediate=0},StatusBarTimerDirection={RemainingTime=1}}
+      C_DurationUtil={CreateDuration=function()
+        return {SetTimeFromStart=function(self,start,duration) self.start,self.duration=start,duration end}
+      end}
+      local swing = new(swingAPI.SwingTimer,"MainHand")
+      local swingEvents = frames[#frames]
+      assert(not swing.HasTiming and swing.Value == 0)
+      swingEvents.onEvent(swingEvents,"PLAYER_SWING",3,1)
+      assert(not swing.HasTiming)
+      swingEvents.onEvent(swingEvents,"PLAYER_SWING",3,0)
+      assert(swing.HasTiming and swing.Value == 3 and swing.Max.Value == 3)
+      now=11.5
+      assert(swing.Value == 1.5 and swing.Percent.Value == 50)
+      local swingView = factory(nil,"progress",{width=100,height=12,source=swing})
+      local swingFrame = API.Mount(nil,swingView)
+      assert(swingFrame.timer.start == 10 and swingFrame.timer.duration == 3)
+      local calls = swingFrame.timerCalls
+      API.Unmount(nil,swingFrame)
+      swingEvents.onEvent(swingEvents,"PLAYER_SWING",2,0)
+      assert(swingFrame.timerCalls == calls and swing.Value == 2)
+      swingEvents.onEvent(swingEvents,"PLAYER_SWING",{secret=true},0)
+      assert(swing:IsSecret() and not pcall(function() return swing.Value end))
+      swingEvents.onEvent(swingEvents,"PLAYER_SWING",2,0)
+      assert(not swing:IsSecret())
+      now=20
+      assert(swing.Value == 0)
+      swingEvents.onEvent(swingEvents,"WEAPON_SLOT_CHANGED")
+      assert(not swing.HasTiming and swing.Max.Value == 0)
+      swing:Dispose()
+      assert(swingEvents.onEvent == nil and next(swingEvents.events) == nil)
+      local labelView = factory(nil,"label",{width=100,height=20,text="Health",fontSize=11})
+      local labelFrame = API.Mount(nil,labelView)
+      assert(labelFrame.fontString.text == "Health" and labelFrame.fontString.size == 11)
+      API.Unmount(nil,labelFrame)
+      local textureAPI = __wuiraModules.require("datasources.TextureSource")
+      local textureID = 123
+      local textureSource = new(textureAPI.TextureSource,function() return textureID end,{"UNIT_AURA"},"player")
+      local iconFrame = API.Mount(nil,factory(nil,"icon",{width=24,height=24,textureSource=textureSource}))
+      assert(iconFrame.textures[1].path == 123)
+      textureID=456
+      iconFrame.onEvent(iconFrame,"UNIT_AURA","target")
+      assert(iconFrame.textures[1].path == 123)
+      iconFrame.onEvent(iconFrame,"UNIT_AURA","player")
+      assert(iconFrame.textures[1].path == 456)
+      API.Unmount(nil,iconFrame)
+      local timerAPI = __wuiraModules.require("datasources.TimerSource")
+      local nativeDuration = {duration=10,start=0}
+      local timerSource = new(timerAPI.TimerSource,function() return nativeDuration end,{"SPELL_UPDATE_COOLDOWN"})
+      local timerFrame = API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=timerSource}))
+      assert(timerFrame.timer == nativeDuration)
+      assert(timerFrame.min == 0 and timerFrame.max == 1)
+      nativeDuration=nil
+      timerFrame.onEvent(timerFrame,"SPELL_UPDATE_COOLDOWN")
+      assert(timerFrame.value == 0)
+      API.Unmount(nil,timerFrame)
+      local remaining = 2
+      nativeDuration = {GetRemainingDuration=function() return remaining end}
+      assert(timerSource.IsActive)
+      local text = "Holy Light"
+      local activeView = factory(nil,"label",{width=100,height=20,
+        text=function() return text end,visible=function() return timerSource.IsActive end})
+      local activeFrame = API.Mount(nil,activeView)
+      local driver = frames[#frames]
+      assert(activeFrame.shown and activeFrame.fontString.text == "Holy Light")
+      remaining=0
+      driver.onUpdate(driver,0.05)
+      assert(not activeFrame.shown and not timerSource.IsActive)
+      remaining=1
+      text="Flash of Light"
+      driver.onUpdate(driver,0.05)
+      assert(activeFrame.shown and activeFrame.fontString.text == "Flash of Light")
+      API.Unmount(nil,activeFrame)
+      assert(driver.onUpdate == nil and not driver.shown)
+      local stock = __wuiraModules.require("platform.BlizzardUI").BlizzardUI
+      PlayerFrame=CreateFrame("Frame",nil,UIParent)
+      TargetFrame=CreateFrame("Frame",nil,UIParent)
+      FocusFrame=CreateFrame("Frame",nil,UIParent)
+      MainMenuBar=CreateFrame("Frame",nil,UIParent)
+      MainMenuBar:RegisterEvent("ACTIONBAR_UPDATE_STATE")
+      local nativeHandler=function() end
+      MainMenuBar:SetScript("OnEvent",nativeHandler)
+      combat=true
+      local restore=stock.Hide(nil,{player=true,target=true,focus=true,actionBars=true})
+      local stockListener=frames[#frames]
+      assert(PlayerFrame.parent == UIParent)
+      combat=false
+      stockListener.onEvent(stockListener,"PLAYER_REGEN_ENABLED")
+      local hiddenParent=PlayerFrame.parent
+      assert(hiddenParent ~= UIParent and not hiddenParent.shown)
+      assert(TargetFrame.parent == hiddenParent and FocusFrame.parent == hiddenParent)
+      assert(MainMenuBar.parent == hiddenParent and MainMenuBar.onEvent == nativeHandler)
+      assert(MainMenuBar.events.ACTIONBAR_UPDATE_STATE)
+      MainMenuBar:SetParent(UIParent)
+      MainMenuBar.onShowHook(MainMenuBar)
+      assert(MainMenuBar.parent == hiddenParent)
+      MultiBarBottomLeft=CreateFrame("Frame",nil,UIParent)
+      stockListener.onEvent(stockListener,"ADDON_LOADED")
+      assert(MultiBarBottomLeft.parent == hiddenParent)
+      combat=true
+      restore()
+      assert(PlayerFrame.parent == hiddenParent)
+      combat=false
+      stockListener.onEvent(stockListener,"PLAYER_REGEN_ENABLED")
+      assert(PlayerFrame.parent == UIParent and TargetFrame.parent == UIParent and FocusFrame.parent == UIParent)
+      assert(MainMenuBar.parent == UIParent and MultiBarBottomLeft.parent == UIParent)
+      assert(next(stockListener.events) == nil and stockListener.onEvent == nil)
+      -- Optional channels do not allocate or read until requested and consumed.
+      local healReads,absorbReads,conditionCalls=0,0,0
+      local incoming,shield=300,200
+      function UnitGetIncomingHeals(unit) assert(unit == "player"); healReads=healReads+1; return incoming end
+      function UnitGetTotalAbsorbs(unit) assert(unit == "player"); absorbReads=absorbReads+1; return shield end
+      health=50
+      local plainHP=new(HP)
+      local plainFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=plainHP}))
+      assert(plainHP.HealPrediction == nil and plainHP.AbsorbPrediction == nil)
+      assert(not plainFrame.events.UNIT_HEAL_PREDICTION and not plainFrame.events.UNIT_ABSORB_AMOUNT_CHANGED)
+      assert(healReads == 0 and absorbReads == 0)
+      API.Unmount(nil,plainFrame)
+      local predictedHP=new(HP):UseHealPrediction():UseAbsorbPrediction()
+      local firstHealChannel=predictedHP.HealPrediction
+      predictedHP:UseHealPrediction():UseAbsorbPrediction()
+      assert(firstHealChannel == predictedHP.HealPrediction and healReads == 0 and absorbReads == 0)
+      predictedHP:When(function(_,value) conditionCalls=conditionCalls+1; return value >= 20 end)
+      predictedHP:When(function(_,value) return value < 100 end)
+      health=10
+      local before=#frames
+      local predictedFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=predictedHP,
+        healPrediction={texture="heal-path"},absorbPrediction={texture="shield-path"}}))
+      local healFrame,shieldFrame=frames[before+2],frames[before+3]
+      assert(#frames == before+3 and not predictedFrame.shown and predictedFrame.value == nil)
+      assert(healReads == 0 and absorbReads == 0 and predictedFrame.onUpdate == nil)
+      assert(predictedFrame.events.UNIT_HEAL_PREDICTION and predictedFrame.events.UNIT_ABSORB_AMOUNT_CHANGED)
+      health=40
+      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","target")
+      assert(not predictedFrame.shown and healReads == 0)
+      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      assert(predictedFrame.shown and predictedFrame.value == 40 and predictedFrame.clipsChildren)
+      assert(healFrame.value == 300 and shieldFrame.value == 200 and healFrame.max == maxHealth)
+      assert(healFrame.fillTexture == "heal-path" and shieldFrame.fillTexture == "shield-path")
+      assert(healFrame.relative == predictedFrame.fill and healFrame.relativeAnchor == "TOPRIGHT")
+      assert(shieldFrame.parent == predictedFrame and shieldFrame.reverse)
+      incoming,shield={secret=true},{secret=true}
+      predictedFrame.onEvent(predictedFrame,"UNIT_HEAL_PREDICTION","player")
+      assert(healFrame.value == incoming and shieldFrame.value == shield)
+      assert(not pcall(function() return predictedHP.HealPrediction.Value end))
+      local priorConditions,priorHealReads=conditionCalls,healReads
+      health={secret=true}
+      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      assert(not predictedFrame.shown and conditionCalls == priorConditions and healReads == priorHealReads)
+      health=110
+      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      assert(not predictedFrame.shown and healReads == priorHealReads) -- chained conditions are AND
+      health,incoming,shield=25,0,0
+      predictedFrame.onEvent(predictedFrame,"UNIT_HEALTH","player")
+      assert(predictedFrame.shown and healFrame.value == 0 and shieldFrame.value == 0)
+      assert(predictedHP.Value == 25 and predictedHP.HealPrediction.Value == 0)
+      API.Unmount(nil,predictedFrame)
+      assert(predictedFrame.onEvent == nil and next(predictedFrame.events) == nil and not healFrame.shown)
+      local hiddenHP=new(HP):When(function() return true end)
+      local hiddenFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=hiddenHP,visible=function() return false end}))
+      hiddenFrame.onEvent(hiddenFrame,"UNIT_HEALTH","player")
+      assert(not hiddenFrame.shown) -- source activation must not override a cell predicate
+      API.Unmount(nil,hiddenFrame)
+      local onlyHeal=new(HP):UseHealPrediction()
+      local onlyHealFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=onlyHeal,healPrediction=false}))
+      assert(onlyHeal.AbsorbPrediction == nil and not onlyHealFrame.events.UNIT_ABSORB_AMOUNT_CHANGED)
+      assert(onlyHealFrame.shown)
+      API.Unmount(nil,onlyHealFrame)
+      for _,vertical in ipairs({false,true}) do
+        for _,reverse in ipairs({false,true}) do
+          local count=#frames
+          local orientedFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,
+            source=new(HP):UseHealPrediction():UseAbsorbPrediction(),
+            orientation=vertical and "vertical" or "horizontal",reverse=reverse}))
+          local h,a=frames[count+2],frames[count+3]
+          local point=vertical and (reverse and "TOPLEFT" or "BOTTOMLEFT") or (reverse and "TOPRIGHT" or "TOPLEFT")
+          local relative=vertical and (reverse and "BOTTOMLEFT" or "TOPLEFT") or (reverse and "TOPLEFT" or "TOPRIGHT")
+          assert(h.anchor == point and h.relativeAnchor == relative and h.reverse == reverse and a.reverse ~= reverse)
+          assert(h.orientation == orientedFrame.orientation and a.orientation == orientedFrame.orientation)
+          API.Unmount(nil,orientedFrame)
+        end
+      end
+      local unsupportedHeals,unsupportedAbsorbs=UnitGetIncomingHeals,UnitGetTotalAbsorbs
+      UnitGetIncomingHeals,UnitGetTotalAbsorbs=nil,nil
+      local unsupportedHP=new(HP):UseHealPrediction():UseAbsorbPrediction()
+      assert(not unsupportedHP.HealPrediction.IsAvailable and not unsupportedHP.AbsorbPrediction.IsAvailable)
+      local unsupportedCount=#frames
+      local unsupportedFrame=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=unsupportedHP}))
+      assert(#frames == unsupportedCount+1 and unsupportedFrame.shown)
+      assert(not unsupportedFrame.events.UNIT_HEAL_PREDICTION and not unsupportedFrame.events.UNIT_ABSORB_AMOUNT_CHANGED)
+      API.Unmount(nil,unsupportedFrame)
+      UnitGetIncomingHeals,UnitGetTotalAbsorbs=unsupportedHeals,unsupportedAbsorbs
+      local restrictedCalls=0
+      local filteredTimer=new(timerAPI.TimerSource,function() return nativeDuration end,{"SPELL_UPDATE_COOLDOWN"})
+      filteredTimer:When(function(_,value) restrictedCalls=restrictedCalls+1; return value ~= nil end)
+      nativeDuration=nil
+      local conditionalTimer=API.Mount(nil,factory(nil,"progress",{width=100,height=10,source=filteredTimer}))
+      assert(not conditionalTimer.shown)
+      nativeDuration={GetRemainingDuration=function() return 1 end}
+      conditionalTimer.onEvent(conditionalTimer,"SPELL_UPDATE_COOLDOWN")
+      assert(conditionalTimer.shown and conditionalTimer.timer == nativeDuration)
+      local restrictedCount=restrictedCalls
+      nativeDuration={secret=true}
+      conditionalTimer.onEvent(conditionalTimer,"SPELL_UPDATE_COOLDOWN")
+      assert(not conditionalTimer.shown and restrictedCalls == restrictedCount)
+      API.Unmount(nil,conditionalTimer)
     `;
     const file = path.join(fixture, "verify.lua");
     fs.writeFileSync(file, script);
@@ -599,4 +831,3 @@ test("split TSX modules load through TOC without a global require", () => {
     fs.rmSync(fixture, { recursive: true, force: true });
   }
 });
-

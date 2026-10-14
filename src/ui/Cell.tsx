@@ -17,10 +17,12 @@ export type CellProps = {
     /** Defaults to true: visual cells do not intercept mouse input. */
     clickThrough?: boolean;
     decorations?: Decorations;
+    /** Visibility does not remove the cell's reserved layout slot. */
+    visible?: () => boolean;
 } & Position<ICell>;
 
 export interface ICell extends Element {
-    kind: "cell" | "flow" | "grid" | "progress";
+    kind: "cell" | "flow" | "grid" | "progress" | "label" | "icon";
     props: CellProps;
 }
 

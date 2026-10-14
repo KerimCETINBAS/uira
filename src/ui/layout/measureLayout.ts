@@ -31,7 +31,7 @@ export function measureLayout(
     ancestors: Element[] = [],
 ): MeasuredCell {
     if (ancestors.includes(element)) error("Layout children contain a cycle");
-    if (element.kind !== "cell" && element.kind !== "flow" && element.kind !== "grid" && element.kind !== "progress") {
+    if (!["cell", "flow", "grid", "progress", "label", "icon"].includes(element.kind)) {
         error(`Unsupported UI element: ${element.kind}`);
     }
     const cell = element as ICell;

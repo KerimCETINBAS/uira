@@ -1,5 +1,8 @@
 import "./console-polyfill";
 export { wuira } from "./wuira";
+export { Spells } from "./Spells";
+export { BlizzardUI } from "./platform/BlizzardUI";
+export type { BlizzardUIOptions } from "./platform/BlizzardUI";
 export { UI } from "./ui/primitives/jsx";
 export type { Element, Component } from "./ui/primitives/jsx";
 export type { Cell } from "./ui/Cell";

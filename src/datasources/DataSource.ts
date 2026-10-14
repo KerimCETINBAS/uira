@@ -1,5 +1,6 @@
 /** A value-producing source. Secrecy describes data, not native frame protection. */
 export abstract class DataSource<T> {
+    private conditions?: ((value: T) => boolean)[];
     protected constructor(private value: T, private secret: boolean = false) {}
 
     /** Checked when consumed, rather than inferred from combat state. */
@@ -20,6 +21,23 @@ export abstract class DataSource<T> {
     }
 
     protected GetValue(): T { return this.value; }
+
+    /** Filters native binding emissions; Value remains a checked, fresh snapshot. */
+    public When(condition: (value: T) => boolean): this {
+        (this.conditions ??= []).push(condition);
+        return this;
+    }
+
+    protected CanEmit(value: T): boolean {
+        if (this.conditions === undefined) return true;
+        // Restricted values must never reach user callbacks or Lua comparisons.
+        if (this.IsValueSecret(value)) return false;
+        for (const condition of this.conditions) {
+            const result = condition(value);
+            if (issecretvalue(result) || !result) return false;
+        }
+        return true;
+    }
 
     private IsValueSecret(value: T): boolean {
         return issecretvalue(value) || this.secret || this.HasSecretFields(value);

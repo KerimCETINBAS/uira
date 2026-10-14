@@ -94,6 +94,118 @@ function App() {
 wuira.Mount(App);
 ```
 
+### Conditional sources and health predictions
+
+```tsx
+import { UI } from "wuira";
+import { ProgressBar } from "wuira/ui";
+import { HP, Unit } from "wuira/datasources";
+
+const hp = new HP(Unit.Player)
+    .UseHealPrediction()
+    .UseAbsorbPrediction()
+    .When(value => value >= 20); // Current health points, not a percentage.
+
+const view = (
+    <ProgressBar width={220} height={24} source={hp}
+        healPrediction={{ texture: "blizzard", color: { r: 0.4, g: 1, b: 0.5, a: 0.5 } }}
+        absorbPrediction={{ texture: "solid", color: { r: 0.8, g: 0.9, b: 1, a: 0.55 } }} />
+);
+```
+
+Configure sources before mounting. `.When()` filters native binding updates using
+the source's own value; repeated calls combine with AND. A false condition hides
+the bound bar and suppresses writes until a relevant event makes it true again.
+The basic health events remain subscribed so the source can reactivate; there is
+no health polling. Predicates should depend on this source's event-driven state,
+not unrelated mutable values. `.Value` remains a fresh, checked snapshot rather
+than a filtered subscription. Secret values never reach condition callbacks:
+a conditional binding becomes inactive until readable data returns. Without a
+condition, opaque values continue directly to native widgets.
+
+Each prediction channel is allocated and its event registered only when explicitly
+enabled and supported. No prediction snapshots are cached. Access
+`hp.HealPrediction?.Value` and `hp.AbsorbPrediction?.Value` when readable, or check
+the channel's `IsAvailable` flag. Direct reads retain the usual secret-value guard.
+The APIs provide incoming healing and existing damage-absorb shields, not a
+forecast of future damage. The adapter uses
+[Blizzard's unit prediction APIs](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/UnitDocumentation.lua).
+
+Enabled channels draw by default; `healPrediction={false}` or
+`absorbPrediction={false}` suppresses an individual overlay. Incoming healing starts
+at the native health-fill edge and clips at the bar boundary. Shields overlay
+inward from the opposite edge, remaining visible even at full health. Both accept
+independent textures/colors and support horizontal, vertical, and reversed bars.
+There is no arithmetic on secret health or prediction amounts. Raw incoming heals
+are not reduced by heal-absorb debuffs; overheal is visually clipped. Prediction
+overlays require the native health scale, so min/max/current overrides are rejected.
+Prediction reads pause while the parent HP condition is inactive. The renderer
+cleans up the overlays and resource subscriptions on unmount.
+
+### Native aura, cooldown, and cast timers
+
+```tsx
+import { UI, Spells } from "wuira";
+import { FlowLayout, ProgressBar, Icon, Label } from "wuira/ui";
+import { AuraTimer, GlobalCooldown, CastTimer, Unit } from "wuira/datasources";
+
+const aura = new AuraTimer(Unit.Player, { spellIds: [Spells.SealOfRighteousness], filter: "HELPFUL" });
+const gcd = new GlobalCooldown();
+const cast = new CastTimer(Unit.Player);
+
+function Timers() {
+    return (
+        <FlowLayout width={200} height={94} direction="vertical" gap={2}>
+            <Icon width={24} height={24} textureSource={aura.Texture} />
+            <ProgressBar height={24} source={aura}><Label text="Aura" /></ProgressBar>
+            <ProgressBar height={18} source={gcd} />
+            <ProgressBar height={22} source={cast} />
+        </FlowLayout>
+    );
+}
+```
+
+These timers pass opaque native duration objects to `SetTimerDuration`; they do
+not calculate restricted durations in Lua. `SpellCooldown(spellId)` tracks a
+specific spell, and `GlobalCooldown` supplies the GCD identifier internally.
+`CastTimer` follows casts and channels. `AuraTimer` resolves localized spell names
+and exposes an associated `Texture` source, with status indicating active,
+inactive, restricted, or unavailable data. Aura access still follows the client's
+restrictions; missing readable data is not reconstructed from combat events.
+`Label` and `Icon` are visual Cells. Application code supplies which spells to
+track; native API declarations and reads remain in wuira.
+
+### Swing timers
+
+```tsx
+import { UI, wuira } from "wuira";
+import { ProgressBar } from "wuira/ui";
+import { SwingTimer, SwingHand } from "wuira/datasources";
+
+const mainHand = new SwingTimer(SwingHand.MainHand);
+const view = wuira.Mount(<ProgressBar width={200} height={12} source={mainHand} />);
+
+// Other choices: SwingHand.OffHand and SwingHand.Ranged.
+// mainHand.Value: remaining seconds; Max.Value: duration; Percent.Value: remaining percent.
+// When removing the feature:
+if (view !== undefined) wuira.Unmount(view);
+mainHand.Dispose();
+```
+
+This source follows the player's `PLAYER_SWING(duration, swingType)` events.
+It does not reconstruct swings from the combat log or track enemy attack cycles.
+`HasTiming` is false until the first readable event and after a weapon/world reset;
+zero before that event is not evidence of a synchronized swing. After a recorded
+cycle expires, remaining time reaches zero. Secret payloads block datasource
+computation until a readable event or reset arrives.
+
+Native progress binding uses `C_DurationUtil` and `StatusBar:SetTimerDuration`,
+with no Lua per-frame animation. Range/current overrides are not supported for
+this binding. Unmount detaches each bar; call `Dispose()` to stop the source's
+event listener when its owning feature ends. Support is capability-checked;
+actual timing still needs validation in Forever. The adapter follows the
+[Forever swing API definition](https://github.com/Gethe/wow-ui-source/blob/bd2470aed543f72697a044e989285b6c83e63f73/Interface/AddOns/Blizzard_APIDocumentationGenerated/SwingTimerDocumentation.lua).
+
 ### Group members
 
 ```ts

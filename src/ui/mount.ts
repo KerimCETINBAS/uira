@@ -7,17 +7,23 @@ import type { Anchor } from "../types/Position";
 import { Background } from "./decorations/Background";
 import { Border } from "./decorations/Border";
 import { resolveStatusBarTexture } from "./decorations/statusBarTextures";
+import type { LabelProps } from "./Label";
+import type { IconProps } from "./Icon";
+import { HP } from "../datasources/Resources";
+import type { TextureOptions } from "../types/Texture";
 
 const mountedFrames = new Map<CellProps, wuiraNativeFrame>();
-const mountedTrees = new Map<wuiraNativeFrame, { frames: wuiraNativeFrame[]; cells: ICell[]; decorations: Decoration[] }>();
+const mountedTrees = new Map<wuiraNativeFrame, { frames: wuiraNativeFrame[]; cells: ICell[]; decorations: Decoration[]; bindings: (() => void)[] }>();
 
 export function unmount(frame: wuiraNativeFrame): void {
     const tree = mountedTrees.get(frame);
     if (tree === undefined) return;
+    for (const dispose of tree.bindings) dispose();
     for (const decoration of tree.decorations) decoration.dispose();
     for (const child of tree.frames) {
         child.UnregisterAllEvents();
         child.SetScript("OnEvent", undefined);
+        child.SetScript("OnUpdate", undefined);
         child.Hide();
     }
     for (const cell of tree.cells) mountedFrames.delete(cell.props);
@@ -75,10 +81,21 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
             target = anchors.get(target);
         }
     }
-    const tree = { frames: pending.map(item => item.frame), cells: pending.map(item => item.cell), decorations: [] as Decoration[] };
+    const tree = { frames: pending.map(item => item.frame), cells: pending.map(item => item.cell), decorations: [] as Decoration[], bindings: [] as (() => void)[] };
     mountedTrees.set(root, tree);
     try {
+        const updates: (() => void)[] = [];
         for (const item of pending) {
+            let sourceActive = true;
+            let lastVisible: boolean | undefined;
+            const visible = item.cell.props.visible;
+            const refreshVisibility = () => {
+                const value = sourceActive && (visible?.() ?? true);
+                if (value === lastVisible) return;
+                lastVisible = value;
+                if (value) item.frame.Show(); else item.frame.Hide();
+            };
+            const onActiveChange = (active: boolean) => { sourceActive = active; refreshVisibility(); };
             const position = item.cell.props;
             const target = anchors.get(item.frame)!;
             const x = item.placement?.x ?? (position.mode === "absolute" ? position.x : position.offset.x);
@@ -87,6 +104,34 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
             const anchor = overrideAnchor ?? (item.placement !== undefined ? "TOPLEFT" : position.anchor ?? "TOPLEFT");
             const relativeAnchor = overrideAnchor ?? (item.placement !== undefined ? "TOPLEFT" : position.relativeAnchor ?? anchor);
             item.frame.SetPoint(anchor, target, relativeAnchor, x + item.margin.left, -(y + item.margin.top));
+            if (item.cell.kind === "label") {
+                const props = item.cell.props as LabelProps;
+                const label = item.frame.CreateFontString(undefined, "OVERLAY");
+                label.SetAllPoints(item.frame);
+                label.SetFont(props.font ?? "Fonts\\FRIZQT__.TTF", props.fontSize ?? 12, "OUTLINE");
+                label.SetJustifyH(props.align ?? "LEFT");
+                label.SetJustifyV("MIDDLE");
+                const color = props.color;
+                label.SetTextColor(color?.r ?? 1, color?.g ?? 1, color?.b ?? 1, color?.a ?? 1);
+                const text = props.text;
+                if (typeof text === "function") {
+                    let previous: string | undefined;
+                    updates.push(() => {
+                        const value = text();
+                        if (issecretvalue(value) || value !== previous) label.SetText(value);
+                        if (!issecretvalue(value)) previous = value;
+                    });
+                } else label.SetText(text);
+            }
+            if (item.cell.kind === "icon") {
+                const props = item.cell.props as IconProps;
+                const texture = item.frame.CreateTexture(undefined, "OVERLAY");
+                texture.SetAllPoints(item.frame);
+                const uv = props.texCoords ?? [0, 1, 0, 1];
+                texture.SetTexCoord(uv[0], uv[1], uv[2], uv[3]);
+                texture.SetTexture(props.texture);
+                props.textureSource?.BindTo(item.frame, texture, onActiveChange);
+            }
             if (item.cell.kind === "progress") {
                 const props = (item.cell as IProgressBar).props;
                 const bar = item.frame as wuiraNativeStatusBar;
@@ -106,9 +151,53 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
                 bar.SetMinMaxValues(props.min ?? 0, props.max ?? 100);
                 const source = item.cell.source ?? props.source;
                 if (source !== undefined) {
-                    source.BindTo(bar, {
+                    let healPredictionBar: wuiraNativeStatusBar | undefined;
+                    let absorbPredictionBar: wuiraNativeStatusBar | undefined;
+                    if (source instanceof HP) {
+                        const overlay = (style: TextureOptions, heal: boolean): wuiraNativeStatusBar => {
+                            bar.SetClipsChildren(true);
+                            const layer = CreateFrame("StatusBar", undefined, bar);
+                            tree.frames.push(layer);
+                            layer.EnableMouse(false);
+                            layer.SetFrameLevel(bar.GetFrameLevel());
+                            layer.SetSize(item.width, item.height);
+                            layer.SetStatusBarTexture(resolveStatusBarTexture(style.texture ?? "solid"));
+                            const tint = style.color!;
+                            layer.SetStatusBarColor(tint.r, tint.g, tint.b, tint.a ?? 0.5);
+                            const texture = layer.GetStatusBarTexture();
+                            texture.SetBlendMode(style.blendMode ?? "BLEND");
+                            texture.SetHorizTile(style.tileX ?? false);
+                            texture.SetVertTile(style.tileY ?? false);
+                            const uv = style.texCoords ?? [0, 1, 0, 1];
+                            texture.SetTexCoord(uv[0], uv[1], uv[2], uv[3]);
+                            const vertical = props.orientation === "vertical";
+                            const reverse = props.reverse ?? false;
+                            layer.SetOrientation(vertical ? "VERTICAL" : "HORIZONTAL");
+                            layer.SetReverseFill(heal ? reverse : !reverse);
+                            if (heal) {
+                                const point = vertical ? (reverse ? "TOPLEFT" : "BOTTOMLEFT") : (reverse ? "TOPRIGHT" : "TOPLEFT");
+                                const relative = vertical ? (reverse ? "BOTTOMLEFT" : "TOPLEFT") : (reverse ? "TOPLEFT" : "TOPRIGHT");
+                                layer.SetPoint(point, bar.GetStatusBarTexture(), relative, 0, 0);
+                            } else {
+                                // Shields overlay from the far edge, including at full health.
+                                layer.SetAllPoints(bar);
+                            }
+                            return layer;
+                        };
+                        if (source.HealPrediction?.IsAvailable === true && props.healPrediction !== false) {
+                            healPredictionBar = overlay({ ...props.healPrediction,
+                                color: props.healPrediction?.color ?? { r: 0.4, g: 1, b: 0.5, a: 0.5 } }, true);
+                        }
+                        if (source.AbsorbPrediction?.IsAvailable === true && props.absorbPrediction !== false) {
+                            absorbPredictionBar = overlay({ ...props.absorbPrediction,
+                                color: props.absorbPrediction?.color ?? { r: 0.8, g: 0.9, b: 1, a: 0.55 } }, false);
+                        }
+                    }
+                    const dispose = source.BindTo(bar, {
                         min: props.min, max: props.max, current: props.current ?? props.value,
+                        onActiveChange, healPredictionBar, absorbPredictionBar,
                     });
+                    if (dispose !== undefined) tree.bindings.push(dispose);
                 } else {
                     bar.SetValue(props.current ?? props.value ?? 0);
                 }
@@ -128,7 +217,24 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
                 : progress?.backdrop !== undefined ? new Border(progress.backdrop) : decorations?.border);
             attach(decorations?.glow);
             mountedFrames.set(item.cell.props, item.frame);
-            item.frame.Show();
+            refreshVisibility();
+            if (visible !== undefined) {
+                updates.push(refreshVisibility);
+            }
+        }
+        if (updates.length > 0) {
+            // An independent driver continues to run even when a root is hidden.
+            const driver = CreateFrame("Frame", undefined, parent);
+            tree.frames.push(driver);
+            let elapsed = 0;
+            driver.SetScript("OnUpdate", (_frame, delta) => {
+                elapsed += delta;
+                if (elapsed < 0.05) return;
+                elapsed = 0;
+                for (const update of updates) update();
+            });
+            for (const update of updates) update();
+            driver.Show();
         }
     } catch (failure) {
         unmount(root);

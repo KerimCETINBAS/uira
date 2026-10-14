@@ -3,6 +3,9 @@ import type { FlowLayoutProps } from "../FlowLayout";
 import type { GridLayoutProps } from "../GridLayout";
 import type { ProgressBarProps } from "../ProgressBar";
 import type { ProgressSource } from "../../datasources/ProgressSource";
+import type { TimerSource } from "../../datasources/TimerSource";
+import type { LabelProps } from "../Label";
+import type { IconProps } from "../Icon";
 
 /** Declarative UI description; native frames are created by mount. */
 export interface Element {
@@ -10,7 +13,7 @@ export interface Element {
     props: object;
     child?: Element;
     children?: Element[];
-    source?: ProgressSource;
+    source?: ProgressSource | TimerSource;
 }
 
 export type Component<P extends object> = (props: P, child?: Element) => Element;
@@ -20,7 +23,7 @@ export namespace UI {
         return { kind: "empty", props: {} };
     }
     export function createElement<P extends object>(
-        component: Component<P> | "cell" | "flow" | "grid" | "progress",
+        component: Component<P> | "cell" | "flow" | "grid" | "progress" | "label" | "icon",
         props: P | undefined,
         ...children: (Element | Element[])[]
     ): Element {
@@ -52,7 +55,7 @@ export namespace UI {
             if (elements.length > 1) throw "Cell accepts at most one child; use FlowLayout for multiple children";
             return {
                 kind: component, props: resolved, child: elements[0],
-                source: (properties as unknown as { source?: ProgressSource }).source,
+                source: (properties as unknown as { source?: ProgressSource | TimerSource }).source,
             };
         }
         const componentProps = children.length === 0 ? properties
@@ -70,6 +73,8 @@ export namespace UI {
             flow: Partial<FlowLayoutProps> & { child?: Element | Element[] };
             grid: Partial<GridLayoutProps> & { child?: Element | Element[] };
             progress: Partial<ProgressBarProps> & { child?: Element };
+            label: Partial<LabelProps>;
+            icon: Partial<IconProps>;
         }
     }
 }

@@ -9,6 +9,45 @@ with the release date and highlight breaking changes explicitly.
 
 No changes yet.
 
+## 0.1.5 — 2026-10-14
+
+### Added
+
+- Event-driven `.When(value => boolean)` source conditions. Inactive bindings
+  hide their visual and skip writes; secret inputs never reach callbacks.
+  Repeated conditions combine with AND, and fresh `.Value` reads remain unchanged.
+- Opt-in `HP.UseHealPrediction()` and `HP.UseAbsorbPrediction()` channels,
+  with lazy allocation, capability checks, and optional event subscriptions.
+- Independently styled healing and shield overlays on HP progress bars,
+  including direct native handling of secret amounts and clipping at bar bounds.
+- Opt-in `BlizzardUI.Hide` for stock action bars and player/target/focus frames,
+  with combat deferral and a restore callback, preserving native event handlers.
+- Cell visibility predicates and live label text, with cleanup on unmount.
+- Timer activity flags and cast/channel spell names for conditional UI rows.
+- Public `Spells` enum with named Paladin Seal spell IDs.
+- Player swing countdown sources for main-hand, off-hand, and ranged attacks,
+  driven by Forever's native swing events and native StatusBar timer animation.
+- Explicit unknown timing before the first readable event, secret-value guards,
+  weapon-change resets, and source disposal.
+- Label and Icon primitives, with event-driven texture sources.
+- Native duration sources for aura timers, spell/global cooldowns, and cast/channel
+  countdowns. Selected aura icons share the aura source's selection policy.
+
+### Fixed
+
+- Initialize native timer and swing bars with a normalized 0–1 range instead
+  of the default resource range.
+- Mount lifecycle now runs datasource binding cleanup callbacks on unmount.
+
+### Validation and limitations
+
+- Lua tests cover conditional activation/reactivation, secret callback guards,
+  optional prediction reads/events, overlay placement, and unmount cleanup.
+- Prediction amounts require the client's native unit APIs. Incoming healing
+  is raw (not reduced by heal-absorb debuffs); overheal is visually clipped.
+  HP overrides are incompatible with prediction overlays. In-game prediction
+  visuals still need validation in Forever.
+
 ## 0.1.4 — 2026-10-14
 
 ### Added

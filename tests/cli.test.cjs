@@ -38,6 +38,11 @@ import { UI } from "wuira";
 import { Cell, ProgressBar } from "wuira/ui";
 import { HP, Unit } from "wuira/datasources";
 const hp = new HP(Unit.Player);
+const predictedHP = new HP().UseHealPrediction().UseAbsorbPrediction().When(value => value >= 20);
+const predictedView = <ProgressBar source={predictedHP} healPrediction={{texture:"blizzard"}} absorbPrediction={{color:{r:1,g:1,b:1,a:0.5}}} />;
+if (predictedHP.HealPrediction === undefined || predictedHP.AbsorbPrediction === undefined || predictedView.kind !== "progress") throw "Prediction exports failed";
+// @ts-expect-error HP predicates receive numbers.
+new HP().When(value => value.missing);
 const view = <Cell width={160} height={24}><ProgressBar source={hp} /></Cell>;
 if (view.kind !== "cell" || view.child?.source !== hp) throw "Public exports failed";
 // @ts-expect-error Width must be a number or inherit.
