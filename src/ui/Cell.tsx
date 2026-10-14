@@ -21,6 +21,8 @@ export type CellProps = {
     alpha?: number | (() => number);
     /** Called after native configuration. The optional cleanup runs on unmount. */
     onMount?: (frame: wuiraNativeFrame) => void | (() => void);
+    /** Visibility condition. Hidden cells keep their reserved layout slot. */
+    condition?: boolean | (() => boolean);
     /** Visibility does not remove the cell's reserved layout slot. */
     visible?: () => boolean;
 } & Position<ICell>;

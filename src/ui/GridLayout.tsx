@@ -1,5 +1,5 @@
 import type { LayoutProps, ILayout } from "./Layout";
-import type { Element } from "./primitives/jsx";
+import type { Element, Children } from "./primitives/jsx";
 import { UI } from "./primitives/jsx";
 
 export interface GridOptions {
@@ -19,6 +19,6 @@ export interface IGridLayout extends ILayout {
     children: Element[];
 }
 
-export function GridLayout(props: Partial<GridLayoutProps> & { child?: Element | Element[] }): Element {
+export function GridLayout(props: Partial<GridLayoutProps> & { child?: Children }): Element {
     return UI.createElement("grid", props, props.child ?? []);
 }

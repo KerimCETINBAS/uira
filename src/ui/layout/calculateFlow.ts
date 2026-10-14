@@ -13,11 +13,22 @@ export function calculateFlow(props: FlowLayoutProps & {width: number; height: n
     let cross = 0;
     let lineSize = 0;
     let count = 0;
+    let lineStart = 0;
+    const alignLine = () => {
+        const free = Number.isFinite(limit) ? Math.max(0, limit - cursor) : 0;
+        const offset = props.justify === "center" ? free / 2 : props.justify === "end" ? free : 0;
+        for (let index = lineStart; index < result.length; index += 1) {
+            if (horizontal) result[index].x += offset;
+            else result[index].y += offset;
+        }
+        lineStart = result.length;
+    };
     for (const child of children) {
         const size = horizontal ? child.width : child.height;
         const crossSize = horizontal ? child.height : child.width;
         const next = count === 0 ? 0 : cursor + gap;
         if (props.grow && count > 0 && next + size > limit) {
+            alignLine();
             cross += lineSize + lineGap;
             cursor = 0;
             lineSize = 0;
@@ -29,5 +40,6 @@ export function calculateFlow(props: FlowLayoutProps & {width: number; height: n
         lineSize = Math.max(lineSize, crossSize);
         count += 1;
     }
+    alignLine();
     return result;
 }

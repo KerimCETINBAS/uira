@@ -21,6 +21,6 @@ export type { AuraTimerOptions, AuraTimerStatus } from "./AuraTimer";
 export { SpellCooldown, GlobalCooldown } from "./SpellCooldown";
 export { SpellSource } from "./SpellSource";
 export { KnownSpells } from "./KnownSpells";
-export type { KnownSpellsStatus } from "./KnownSpells";
+export type { KnownSpellsStatus, KnownSpell } from "./KnownSpells";
 export { ManaRegenTimer } from "./ManaRegenTimer";
 export type { ManaRegenPhase } from "./ManaRegenTimer";

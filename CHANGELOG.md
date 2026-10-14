@@ -7,6 +7,37 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.1.8 — 2026-10-14
+
+### Added
+
+- Standalone `Window` hosts with draggable headers, Escape-to-close, content
+  cleanup, and protected-content close deferral.
+- Frameless `ForEach` JSX expansion with typed render children and nested groups.
+  Cell's single-child rule is enforced after expansion; lists are snapshots.
+- `Cell.condition` accepts a boolean or visibility callback, combines with existing
+  `visible`, and respects protected-tree combat deferral. Secret conditions hide cells.
+- `KnownSpells.Filter(pattern)` matches cached localized names with whole-name
+  `*`/`?` globs and ASCII case-insensitive comparisons, returning detached metadata.
+- Per-line `FlowLayout.justify` alignment (`start`, `center`, or `end`), including
+  wrapped rows and vertical columns.
+- Cached `KnownSpells.Entries` metadata and rank-aware `Find`, including localized
+  names and native passive flags. Metadata changes also notify observers.
+- Named Paladin Blessing, Greater Blessing, and Aura spell identifiers.
+
+### Fixed
+
+- Layout children accept mixed JSX siblings and nested arrays with ordered
+  expansion and cycle checks.
+
+### Validation and limitations
+
+- Lua and package tests cover loop expansion, typed render children, visibility,
+  cached name filtering, alignment, window cleanup, and protected close deferral.
+- ForEach expands a snapshot when its view is created. Applications own event
+  subscriptions and rebuild protected views outside combat. Serialized expression
+  parsing and the visual editor are application features.
+
 ## 0.1.7 — 2026-10-14
 
 ### Added

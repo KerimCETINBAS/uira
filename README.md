@@ -168,6 +168,21 @@ validate required arguments inside your callback.
 
 ### Addon settings and editing tools
 
+Create a standalone window with mounted JSX content. Bind a header as its drag
+handle; Escape or `Close()` releases the content while preserving the host's
+screen position for the next opening:
+
+```tsx
+import { Window, FlowLayout, Label } from "wuira/ui";
+
+const window = new Window({ width: 1000, height: 680 });
+window.Open(() => (
+    <FlowLayout onMount={frame => window.BindDragHandle(frame)}>
+        <Label height={40} text="My addon" />
+    </FlowLayout>
+));
+```
+
 Register a normal JSX view in Forever's native addon settings list:
 
 ```tsx
@@ -206,13 +221,64 @@ import { KnownSpells } from "wuira/datasources";
 const known = new KnownSpells();
 const spellIds = known.Value; // readonly number[], read from the cache
 const canJudge = known.Has(Spells.Judgement);
+const activeSpells = known.Entries.filter(spell => spell.isPassive === false);
+const learnedRank = known.Find(Spells.Judgement); // { id, name, isPassive } or undefined
+const seals = known.Filter("Seal*"); // Detached matching entries, including learned ranks.
 const stop = known.onChange(ids => console.log("Learned spells:", ids.length));
 // On disposal: stop(); known.Dispose();
 ```
 
+`Entries` returns detached cached metadata. An unknown passive flag stays
+`undefined`; unreadable spellbooks return no entries. Metadata changes also notify
+`onChange` observers, even when the spell IDs have not changed.
+
+`Filter` matches the entire localized name. `*` matches any sequence and `?` one
+byte; matching ignores ASCII case. Filtering reads the cache without polling the
+spellbook. Patterns must use names in the client's language.
+
 Protected button trees must be rebuilt outside combat; applications can defer a
 changed selection until `PLAYER_REGEN_ENABLED`. `Cell.alpha` changes appearance
 without changing a button's protected action or its interaction state.
+
+For wrapped action rows, `FlowLayout` supports `grow` and per-line `justify`:
+
+```tsx
+<FlowLayout width={220} height={52} direction="horizontal" gap={4} grow justify="center">
+    {buttons /* 24-unit buttons wrap after eight; the last row is centered. */}
+</FlowLayout>
+```
+
+Use `ForEach` to expand a snapshot into layout children without wrapper frames:
+
+```tsx
+import { UI } from "wuira";
+import { FlowLayout, ForEach, SecureButton } from "wuira/ui";
+
+function SealButtons() {
+    return (
+        <FlowLayout width={220} height={24} direction="horizontal" gap={4}>
+            <ForEach items={known.Filter("Seal*")}>
+                {(spell, index) => (
+                    <SecureButton width={24} height={24}
+                        action={{ type: "spell", spell: spell.id }} condition={spell.isPassive === false} />
+                )}
+            </ForEach>
+        </FlowLayout>
+    );
+}
+```
+
+The render function receives the item and its zero-based index. Use `ForEach`
+inside a layout for multiple siblings; Cell still accepts at most one expanded
+child. Nested loops are flattened in order. `ForEach` creates no subscriptions:
+recreate the view from `known.onChange` when needed, outside combat for protected
+trees. Each filtered rank remains a separate entry.
+
+All visual cells accept `condition={boolean}` or `condition={() => boolean}`.
+This controls visibility and retains the layout slot. It combines with datasource
+activity and the existing `visible` predicate. Callbacks use the shared visibility
+update driver; protected changes wait until combat ends. Secret conditions hide
+the cell without inspecting their value.
 
 ### Empty native action bars
 

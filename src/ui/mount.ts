@@ -139,9 +139,11 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
             let sourceActive = true;
             let lastVisible: boolean | undefined;
             const visible = item.cell.props.visible;
+            const condition = item.cell.props.condition;
             const refreshVisibility = () => {
                 if (protect(root, tree) && InCombatLockdown()) return;
-                const value = sourceActive && (visible?.() ?? true);
+                const allowed = sourceActive && (typeof condition === "function" ? condition() : condition ?? true);
+                const value = !issecretvalue(allowed) && allowed && (visible?.() ?? true);
                 if (value === lastVisible) return;
                 lastVisible = value;
                 if (value) item.frame.Show(); else item.frame.Hide();
@@ -322,7 +324,7 @@ export function mount(element: Element, parent: wuiraNativeFrame = UIParent, roo
             refreshVisibility();
             const cleanup = item.cell.props.onMount?.(item.frame);
             if (cleanup !== undefined) tree.bindings.push(cleanup);
-            if (visible !== undefined) {
+            if (visible !== undefined || typeof condition === "function") {
                 updates.push(refreshVisibility);
             }
         }

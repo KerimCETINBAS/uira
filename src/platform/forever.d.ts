@@ -139,6 +139,7 @@ declare const C_UnitAuras: {
     GetAuraDuration?: (this: void, unit: string, id: number) => import("../datasources/TimerSource").NativeDuration | undefined;
 } | undefined;
 declare const C_Spell: {
+    IsSpellPassive?: (this: void, id: number | string) => boolean;
     PickupSpell?: (this: void, id: number) => void;
     GetSpellPowerCost?: (this: void, id: number) => { type: number; cost?: number }[] | undefined;
     GetSpellName?: (this: void, id: number | string) => string | undefined;
@@ -154,12 +155,13 @@ declare const C_SpellBook: {
         itemIndexOffset: number; numSpellBookItems: number;
     } | undefined;
     GetSpellBookItemInfo?: (this: void, slot: number, bank: number) => {
-        itemType: number; spellID?: number; name?: string; isOffSpec?: boolean;
+        itemType: number; spellID?: number; name?: string; isOffSpec?: boolean; isPassive?: boolean;
     } | undefined;
 } | undefined;
 declare const GetNumSpellTabs: ((this: void) => number) | undefined;
 declare const GetSpellTabInfo: ((this: void, tab: number) => wuiraNativeReturns<[string, number, number, number]>) | undefined;
 declare const GetSpellBookItemInfo: ((this: void, slot: number, bank: "spell") => wuiraNativeReturns<[string | undefined, number | undefined]>) | undefined;
+declare const IsPassiveSpell: ((this: void, slot: number, bank: "spell") => boolean) | undefined;
 declare const C_DurationUtil: {
     CreateDuration(this: void): import("../datasources/TimerSource").NativeDuration & {
         SetTimeFromStart(start: number, duration: number): void;

@@ -19,6 +19,8 @@ export interface Element {
 }
 
 export type Component<P extends object> = (props: P, child?: Element) => Element;
+export type Children = Element | readonly Children[];
+type RenderChild = (item: never, index: number) => Element;
 
 export namespace UI {
     export function Fragment(): Element {
@@ -27,18 +29,35 @@ export namespace UI {
     export function createElement<P extends object>(
         component: Component<P> | "cell" | "flow" | "grid" | "progress" | "label" | "icon" | "button" | "secureButton",
         props: P | undefined,
-        ...children: (Element | Element[])[]
+        ...children: (Children | RenderChild)[]
     ): Element {
-        const elements: Element[] = [];
-        for (const child of children) {
+        const elements: (Element | RenderChild)[] = [];
+        const groups = new Set<object>();
+        const append = (child: Children | RenderChild) => {
             if (Array.isArray(child)) {
-                for (const element of child) elements.push(element);
-            } else {
-                elements.push(child);
+                if (groups.has(child)) error("UI children contain a cycle");
+                groups.add(child);
+                for (const nested of child) append(nested);
+                groups.delete(child);
+                return;
             }
-        }
+            if (typeof child === "function") { elements.push(child); return; }
+            const element = child as Element;
+            if (element.kind === "empty") return;
+            if (element.kind === "group") {
+                if (groups.has(element)) error("UI groups contain a cycle");
+                groups.add(element);
+                for (const nested of element.children ?? []) append(nested);
+                groups.delete(element);
+            } else elements.push(element);
+        };
+        for (const child of children) append(child);
         const properties = props ?? ({} as P);
         if (typeof component === "string") {
+            for (const child of elements) {
+                if (typeof child === "function") error("Render functions must be children of a component such as ForEach");
+            }
+            const visualChildren = elements as Element[];
             const input = properties as unknown as Partial<FlowLayoutProps & GridLayoutProps & ProgressBarProps>;
             const resolved = {
                 ...properties,
@@ -52,18 +71,18 @@ export namespace UI {
                 ...(component === "grid" ? { columns: input.columns ?? 1 } : {}),
             };
             if (component === "flow" || component === "grid") {
-                return { kind: component, props: resolved, children: elements };
+                return { kind: component, props: resolved, children: visualChildren };
             }
             if (elements.length > 1) throw "Cell accepts at most one child; use FlowLayout for multiple children";
             return {
-                kind: component, props: resolved, child: elements[0],
+                kind: component, props: resolved, child: visualChildren[0],
                 source: (properties as unknown as { source?: ProgressSource | TimerSource }).source,
             };
         }
         const componentProps = children.length === 0 ? properties
             : { ...properties, child: elements.length === 1 ? elements[0] : elements };
         if (component === Fragment && elements.length !== 0) throw "Only empty fragments are supported for now";
-        return component(componentProps, elements[0]);
+        return component(componentProps, typeof elements[0] === "function" ? undefined : elements[0]);
     }
 
     // Keep JSX types beside the factory so TSX files only need one import.
@@ -72,8 +91,8 @@ export namespace UI {
         export interface ElementChildrenAttribute { child: {}; }
         export interface IntrinsicElements {
             cell: Partial<CellProps> & { child?: Element };
-            flow: Partial<FlowLayoutProps> & { child?: Element | Element[] };
-            grid: Partial<GridLayoutProps> & { child?: Element | Element[] };
+            flow: Partial<FlowLayoutProps> & { child?: Children };
+            grid: Partial<GridLayoutProps> & { child?: Children };
             progress: Partial<ProgressBarProps> & { child?: Element };
             label: Partial<LabelProps>;
             icon: Partial<IconProps>;

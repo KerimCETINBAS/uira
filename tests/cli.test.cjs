@@ -35,7 +35,7 @@ test("CLI creates and builds a standalone empty-JSX addon", async () => {
     assert.equal(result.stderr, "");
     fs.appendFileSync(path.join(project, "src/index.tsx"), `
 import { UI } from "wuira";
-import { Cell, ProgressBar, SecureButton, Button, FrameMover, KeybindCapture } from "wuira/ui";
+import { Cell, FlowLayout, ForEach, Window, ProgressBar, SecureButton, Button, FrameMover, KeybindCapture } from "wuira/ui";
 import { HP, Unit } from "wuira/datasources";
 import { SpellSource, KnownSpells } from "wuira/datasources";
 const hp = new HP(Unit.Player);
@@ -52,9 +52,23 @@ if (predictedHP.HealPrediction === undefined || predictedHP.AbsorbPrediction ===
 // @ts-expect-error HP predicates receive numbers.
 new HP().When(value => value.missing);
 const view = <Cell width={160} height={24}><ProgressBar source={hp} /></Cell>;
+const repeated = <FlowLayout width={100} height={24} direction="horizontal">
+    <Cell width={1} height={1} />
+    <ForEach items={[10, 20]}>{(width, index) => <Cell width={width} height={index + 1} condition={width > 0} />}</ForEach>
+    {[30, 40].map(width => <Cell width={width} height={1} />)}
+</FlowLayout>;
+if (repeated.children?.length !== 5 || (repeated.children[2].props as {width:number}).width !== 20) throw "ForEach expansion failed";
+// @ts-expect-error Loop items must match the input array.
+const invalidLoop = <ForEach items={[1]}>{(item: string) => <Cell />}</ForEach>;
+// @ts-expect-error Conditions are booleans or boolean callbacks.
+const invalidCondition = <Cell condition="yes" />;
 const secureView = <SecureButton width={32} height={32} action={{type:"spell",spell:635,unit:Unit.Player}}><Cell /></SecureButton>;
 const slotView = <secureButton action={{type:"action",slot:25}} />;
 if (false) {
+    const window = new Window({width: 800, height: 600});
+    window.Open(() => <Cell onMount={frame => window.BindDragHandle(frame)} />);
+    window.Close();
+    window.Dispose();
     const unregister = wuira.registerCommand("/hello", (...args: string[]) => console.log(...args));
     wuira.registerCommand("/optional", (...args) => console.log(args.at(0)?.toUpperCase()));
     unregister();
@@ -70,6 +84,14 @@ if (false) {
     const known = new KnownSpells();
     const ids: readonly number[] = known.Value;
     const learned: boolean = known.Has(20271);
+    const activeSpells = known.Entries.filter(spell => spell.isPassive === false);
+    const learnedName: string | undefined = known.Find(20271)?.name;
+    const seals = known.Filter("Seal*");
+    const sealButtons = <FlowLayout><ForEach items={seals}>{spell => <SecureButton action={{type:"spell",spell:spell.id}} />}</ForEach></FlowLayout>;
+    // @ts-expect-error Name filters must be strings.
+    known.Filter(123);
+    // @ts-expect-error Cached spell metadata is readonly.
+    activeSpells[0].name = "Changed";
     const stop = known.onChange(spells => console.log(spells.length));
     stop();
     known.Dispose();

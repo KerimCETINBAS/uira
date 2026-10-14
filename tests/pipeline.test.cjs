@@ -297,11 +297,11 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         assert(texture.width > 0 and texture.x >= 0 and texture.x + texture.width <= 40.0001)
       end
       API.Unmount(nil,roundedFrame)
-      local function flowTest(direction,grow,widths,heights,expected)
+      local function flowTest(direction,grow,widths,heights,expected,justify)
         local children = {}
         for i=1,#widths do children[i] = child(widths[i],heights[i]) end
         local first = #frames+1
-        local frame = API.Mount(nil,node("flow",{width=50,height=50,direction=direction,grow=grow,gap=5},children))
+        local frame = API.Mount(nil,node("flow",{width=50,height=50,direction=direction,grow=grow,gap=5,justify=justify},children))
         for i=1,#children do
           local actual = frames[first+i]
           assert(actual.parent == frame and actual.x == expected[i][1] and actual.y == -expected[i][2])
@@ -314,6 +314,57 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       flowTest("horizontal",false,{40,30},{10,10},{{0,0},{45,0}})
       flowTest("vertical",true,{10,15,8},{20,25,10},{{0,0},{0,25},{20,0}})
       flowTest("horizontal",true,{80,10},{10,10},{{0,0},{0,15}})
+      flowTest("horizontal",true,{20,25,10},{10,15,8},{{0,0},{25,0},{20,20}},"center")
+      flowTest("vertical",true,{10,15,8},{20,25,10},{{0,0},{0,25},{20,20}},"center")
+      flowTest("horizontal",false,{10,10},{10,10},{{25,0},{40,0}},"end")
+      flowTest("horizontal",true,{80,10},{10,10},{{0,0},{20,15}},"center")
+      do
+      local function verifyForEach()
+        local each=__wuiraModules.require("ui.ForEach").ForEach
+        local count=0
+        local repeated=factory(nil,each,{items={10,20}},function(_,width,index)
+          count=count+1
+          return factory(nil,"cell",{width=width,height=index+1})
+        end)
+        local view=factory(nil,"flow",{width=100,height=20,direction="horizontal",gap=3},repeated)
+        assert(#view.children==2 and count==2 and view.children[2].props.height==2)
+        local before=#frames
+        local root=API.Mount(nil,view)
+        assert(#frames==before+3 and frames[before+2].parent==root and frames[before+3].x==13,'ForEach creates siblings without a wrapper frame')
+        API.Unmount(nil,root)
+        local empty=factory(nil,each,{items={}},function() error('empty loop called') end)
+        local root=API.Mount(nil,factory(nil,"flow",{width=100,height=20},empty))
+        assert(#frames==before+4,'empty loops add no native frames')
+        API.Unmount(nil,root)
+        local nested=factory(nil,each,{items={1,2}},function(_,value)
+          return factory(nil,each,{items={value,value+2}},function(_,width) return factory(nil,"cell",{width=width,height=1}) end)
+        end)
+        local flattened=factory(nil,"flow",{width=100,height=20},nested,factory(nil,"cell",{width=5,height=1}))
+        assert(#flattened.children==5 and flattened.children[1].props.width==1 and flattened.children[2].props.width==3 and flattened.children[3].props.width==2)
+        assert(not pcall(factory,nil,"cell",{width=100,height=20},repeated),'Cell still accepts one child')
+        assert(not pcall(factory,nil,"flow",{},function() end),'native layouts reject render functions')
+        assert(not pcall(each,nil,{items={1}}),'loop render callback required')
+        local cycle={kind='group',props={},children={}}
+        cycle.children[1]=cycle
+        assert(not pcall(factory,nil,"flow",{},cycle),'group cycles rejected')
+        local allowed=false
+        local legacy=true
+        local view=factory(nil,"cell",{width=10,height=10,condition=function() return allowed end,visible=function() return legacy end})
+        local conditional=API.Mount(nil,view)
+        local driver=frames[#frames]
+        assert(not conditional.shown)
+        allowed=true; driver.onUpdate(driver,.1); assert(conditional.shown)
+        legacy=false; driver.onUpdate(driver,.1); assert(not conditional.shown)
+        legacy=true; allowed={secret=true}; driver.onUpdate(driver,.1); assert(not conditional.shown)
+        allowed=true; driver.onUpdate(driver,.1); assert(conditional.shown)
+        API.Unmount(nil,conditional)
+        assert(driver.onUpdate==nil,'condition driver cleaned up')
+        local hidden=API.Mount(nil,factory(nil,"cell",{width=10,height=10,condition=false}))
+        assert(not hidden.shown)
+        API.Unmount(nil,hidden)
+      end
+      verifyForEach()
+      end
       local grid = node("grid",{sizing="content",columns=2,gap=3},{child(10,5),child(20,8),child(12,6)})
       local gridFrame = API.Mount(nil,grid)
       assert(gridFrame.width == 43 and gridFrame.height == 17)
@@ -665,8 +716,8 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         Enum={SpellBookSpellBank={Player=0},SpellBookItemType={Spell=1}}
         local reads=0
         local items={
-          {spellID=20287,name="Seal of Righteousness",itemType=1},
-          {spellID=20287,name="Seal of Righteousness",itemType=1}, -- Duplicate entry.
+          {spellID=20287,name="Seal of Righteousness",itemType=1,isPassive=false},
+          {spellID=20287,name="Seal of Righteousness",itemType=1,isPassive=false}, -- Duplicate entry.
           {spellID=21082,name="Seal of the Crusader",itemType=2}, -- Future spell.
           {spellID=20375,name="Seal of Command",itemType=1,isOffSpec=true},
           {spellID=20216,name="Divine Favor",itemType=1,isPassive=true},
@@ -686,7 +737,17 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         assert(frame.onUpdate == nil and source.Status == "ready")
         assert(#source.Value == 2 and source:Has(21084) and source:Has(20287))
         assert(not source:Has(21082) and not source:Has(20375))
+        assert(#source.Entries == 2 and source:Find(21084).id == 20287)
+        assert(source:Find("Divine Favor").isPassive == true and source:Find(20287).isPassive == false)
+        assert(#source:Filter('sEAL*')==1 and source:Filter('sEAL*')[1].id==20287)
+        assert(#source:Filter('*Favor')==1 and #source:Filter('Seal of Righteousnes?')==1 and #source:Filter('Seal')==0)
+        assert(#source:Filter('*')==2 and not pcall(source.Filter,source,{secret=true}))
+        local metadata=source.Entries
+        metadata[1].name="Modified"
+        assert(source:Find("Divine Favor").name == "Divine Favor")
         local count=reads
+        local filtered=source:Filter('Seal*'); filtered[1].name='Changed'
+        assert(source:Filter('Seal*')[1].name=='Seal of Righteousness' and reads==count,'filters copy the cache without native reads')
         local snapshot=source.Value
         snapshot[1]=0
         assert(source.Value[1] ~= 0 and reads == count) -- Read copies cached data, never the book.
@@ -703,19 +764,26 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         assert(changes == 2 and source:Has(20375))
         emit("PLAYER_LEVEL_UP",40)
         assert(changes == 2)
+        items[5].isPassive=false
+        emit("SPELLS_CHANGED")
+        assert(changes == 3 and source:Find(20216).isPassive == false)
         items[1].spellID={secret=true}
         emit("SPELLS_CHANGED")
-        assert(source.Status == "restricted" and not pcall(function() return source.Value end))
+        assert(source.Status == "restricted" and #source.Entries == 0 and source:Find(21084) == nil and not pcall(function() return source.Value end))
         items[1].spellID=20287
         emit("PLAYER_ENTERING_WORLD")
-        assert(source.Status == "ready" and changes == 3)
+        assert(source.Status == "ready" and changes == 4)
         stop()
         items[3].itemType=2
         emit("SPELLS_CHANGED")
-        assert(changes == 3)
+        assert(changes == 4)
+        items[5].name='Spell [x].+%-(A)^$'
+        emit('SPELLS_CHANGED')
+        assert(#source:Filter('Spell [x].+%-(A)^$')==1,'glob escapes Lua pattern metacharacters')
         source:Dispose()
         assert(next(frame.events) == nil and frame.onEvent == nil)
         C_SpellBook=nil
+        function IsPassiveSpell(slot,bank) assert(slot == 1 and bank == "spell"); return false end
         function GetNumSpellTabs() return 1 end
         function GetSpellTabInfo() return "Holy",123,0,2 end
         function GetSpellBookItemInfo(slot,bank)
@@ -725,8 +793,9 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         end
         local legacy=new(class)
         assert(#legacy.Value == 1 and legacy.Value[1] == 633)
+        assert(legacy.Entries[1].isPassive == false)
         legacy:Dispose()
-        GetNumSpellTabs=nil; GetSpellTabInfo=nil; GetSpellBookItemInfo=nil
+        GetNumSpellTabs=nil; GetSpellTabInfo=nil; GetSpellBookItemInfo=nil; IsPassiveSpell=nil
         C_SpellBook,C_Spell,Enum=oldBook,oldSpell,oldEnum
       end
       verifyKnownSpells()
@@ -1089,7 +1158,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       combat=false
       local visible=true
       local before=#frames
-      local secureView=factory(nil,"cell",{width=100,height=40,visible=function() return visible end},
+      local secureView=factory(nil,"cell",{width=100,height=40,condition=function() return visible end},
         factory(nil,"secureButton",{action={type="spell",spell=635,unit="player"}},
           factory(nil,"label",{text="Heal"})))
       local root=API.Mount(nil,secureView)
@@ -1285,6 +1354,33 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         local oldCenter=UIParent.GetCenter
         function UIParent:GetCenter() return 0,0 end
         combat=false
+        do
+          local Window=__wuiraModules.require('ui.Window').Window
+          local window=new(Window,{width=640,height=480})
+          local header
+          assert(not window.IsOpen and not window.Frame.keyboard)
+          window:Open(factory(nil,'cell',{onMount=function(_,frame)
+            header=frame
+            return window:BindDragHandle(frame)
+          end}))
+          assert(window.IsOpen and window.Frame.keyboard and header.parent==window.Frame)
+          header.scripts.OnDragStart(header); assert(window.Frame.moving)
+          header.scripts.OnDragStop(header); assert(not window.Frame.moving)
+          window.Frame.scripts.OnKeyDown(window.Frame,'A'); assert(window.Frame.propagate)
+          window.Frame.scripts.OnKeyDown(window.Frame,'ESCAPE')
+          assert(not window.IsOpen and not window.Frame.keyboard and not header.shown and header.scripts.OnDragStart==nil)
+          window:Open(factory(nil,'cell',{}))
+          function window.Frame:IsProtected() return true end
+          combat=true
+          local propagate=window.Frame.propagate
+          window.Frame.scripts.OnKeyDown(window.Frame,'ESCAPE')
+          assert(window.IsOpen and window.Frame.propagate==propagate,'protected windows defer close without keyboard writes')
+          combat=false; emit('PLAYER_REGEN_ENABLED'); assert(not window.IsOpen)
+          window:Dispose(); window:Dispose()
+          assert(next(window.Frame.events)==nil and window.Frame.scripts.OnKeyDown==nil)
+          assert(not pcall(window.Open,window,factory(nil,'cell',{})))
+          assert(not pcall(new,Window,{width=0,height=10}))
+        end
         local clicks,cleanups=0,0
         local control=API.Mount(nil,factory(nil,"button",{width=100,height=30,
           onClick=function() clicks=clicks+1 end,
