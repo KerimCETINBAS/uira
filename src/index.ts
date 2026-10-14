@@ -1,5 +1,6 @@
 import "./console-polyfill";
-export { wuira } from "./wuira";
+export { Wuira, wuira } from "./wuira";
+export { WuiraApp } from "./WuiraApp";
 export type { CommandCallback } from "./platform/SlashCommands";
 export { AddonSettings } from "./platform/AddonSettings";
 export { Encoding } from "./platform/Encoding";

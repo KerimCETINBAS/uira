@@ -248,7 +248,8 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       emit("UNIT_HEALTH","player")
       assert(demoBar.value == health) -- Opaque data goes straight to native display, never through compute.
       frames = {box} -- Keep subsequent geometry assertions independent of the demo decoration.
-      local mount = __wuiraModules.require("ui.mount").mount
+      local Renderer = __wuiraModules.require("wuira").Wuira
+      local function mount(_, element, parent) return Renderer.Mount(nil, element, nil, parent) end
       local nested = mount(nil, { kind = "cell", props = {width=40,height=20,mode="absolute",x=5,y=7}, child =
         {kind="cell",props={width=10,height=10,mode="relative",offset={x=3,y=4}}}
       }, box)
@@ -287,7 +288,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       emit("UNIT_HEALTH","player")
       assert(overridden.min == 10 and overridden.max == 100 and overridden.value == 25)
       assert(healthEvents.events.UNIT_HEALTH and manaEvents.events.UNIT_POWER_UPDATE)
-      __wuiraModules.require("ui.mount").unmount(nil,box)
+      Renderer.Unmount(nil,box)
       assert(next(demoBar.events) == nil and demoBar.onEvent == nil and not demoBar.shown)
       assert(next(manaBar.events) == nil and manaBar.onEvent == nil and not box.shown)
       local Background = __wuiraModules.require("ui.decorations.Background").Background
@@ -295,6 +296,16 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       local Glow = __wuiraModules.require("ui.decorations.Glow").Glow
       local API = __wuiraModules.require("wuira").wuira
       local factory = __wuiraModules.require("ui.primitives.jsx").UI.createElement
+      assert(API == __wuiraModules.require("wuira").Wuira and API.App == API.App)
+      local AppClass = __wuiraModules.require("WuiraApp").WuiraApp
+      local firstApp,secondApp=new(AppClass),new(AppClass)
+      local sharedAppView=factory(nil,"cell",{width=12,height=12})
+      local firstRoot=firstApp:Mount(sharedAppView)
+      local secondRoot=secondApp:Mount(sharedAppView)
+      secondApp:Unmount(firstRoot);assert(firstRoot.shown and secondRoot.shown,"application cleanup cannot cross ownership")
+      firstApp:Unmount(firstRoot);assert(not firstRoot.shown and secondRoot.shown)
+      assert(not pcall(function() secondApp:Mount(sharedAppView) end),"one mounted instance per application")
+      secondApp:Unmount(secondRoot)
       local measure = __wuiraModules.require("ui.layout.measureLayout").measureLayout
       local function node(kind,props,children) return factory(nil,kind,props,children or {}) end
       local function child(w,h) return node("cell",{width=w,height=h}) end

@@ -34,7 +34,9 @@ test("CLI creates and builds a standalone empty-JSX addon", async () => {
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(result.stderr, "");
     fs.appendFileSync(path.join(project, "src/index.tsx"), `
-import { UI, Encoding, Store as RootStore, StoreRegistry as RootStoreRegistry } from "wuira";
+import { UI, Encoding, wuira, WuiraApp, Store as RootStore, StoreRegistry as RootStoreRegistry } from "wuira";
+const currentApp: WuiraApp = Wuira.App;
+if (currentApp !== Wuira.App || wuira !== Wuira) throw "Application accessor must remain stable";
 import { PaladinSpells, MageSpells, RacialSpells, GeneralSpells, BindingActions } from "wuira/spells";
 import { WarriorSpells } from "wuira/spells/WarriorSpells";
 const constantHeal = PaladinSpells.HolyLight;

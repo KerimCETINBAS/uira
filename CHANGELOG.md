@@ -7,6 +7,16 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.1 — 2026-10-15
+
+### Changed
+
+- Make Wuira the static accessor for the addon's WuiraApp instance, which owns
+  mounted trees and their lifecycle. Keep wuira as a compatibility alias.
+- Move the renderer out of ui/mount.ts into WuiraApp and focused rendering
+  helpers for geometry, widgets, visibility, decorations and updates.
+- Generate new addon entry points using Wuira.Mount.
+
 ## 0.2.0 — 2026-10-15
 
 ### Removed

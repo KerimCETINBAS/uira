@@ -8,7 +8,7 @@ wuira is a UI framework and addon toolchain for developers who want to describe 
 
 An interface should be easy to understand by reading its source. A health display can be a progress bar inside a layout; a player display can be a composition of bars, labels, and icons rather than a special unit-frame class. wuira provides the foundations for that approach, with TypeScript checking your component props before the addon reaches the game.
 
-The snippets below use the lowercase JSX primitives. In a generated project, import `{ UI, wuira }` from `wuira` before mounting a view. Each view example is independent.
+The snippets below use the lowercase JSX primitives. In a generated project, import `{ UI, Wuira }` from `wuira` before mounting a view. Each view example is independent. Wuira is a static accessor; Wuira.App is the current addon's WuiraApp instance and owns its mounted trees and cleanup. Separate addons keep independent application state. The lowercase wuira export remains available for existing addons.
 
 ### JSX composition
 
@@ -29,7 +29,7 @@ function App() {
     );
 }
 
-wuira.Mount(App);
+Wuira.Mount(App);
 ```
 
 ### Native widgets
@@ -48,7 +48,7 @@ const view = (
     />
 );
 
-wuira.Mount(view);
+Wuira.Mount(view);
 ```
 
 ### Layout primitives
@@ -65,7 +65,7 @@ const view = (
     </flow>
 );
 
-wuira.Mount(view);
+Wuira.Mount(view);
 ```
 
 For rows and columns, use `<grid columns={2} gap={8}>` with an explicit width and height.
@@ -91,7 +91,7 @@ function App() {
     );
 }
 
-wuira.Mount(App);
+Wuira.Mount(App);
 ```
 
 ### Conditional sources and health predictions
@@ -145,9 +145,9 @@ cleans up the overlays and resource subscriptions on unmount.
 ### Slash commands
 
 ```ts
-import { wuira } from "wuira";
+import { Wuira } from "wuira";
 
-const unregister = wuira.registerCommand("/myaddon", (...args: string[]) => {
+const unregister = Wuira.registerCommand("/myaddon", (...args: string[]) => {
     console.log("Arguments:", ...args);
 });
 
@@ -324,10 +324,10 @@ also available for applications that manage their own persistence and lifecycle.
 decorations and one child. Mount it like any other component:
 
 ```tsx
-import { UI, wuira } from "wuira";
+import { UI, Wuira } from "wuira";
 import { SecureButton, Label } from "wuira/ui";
 
-wuira.Mount(() => (
+Wuira.Mount(() => (
     <SecureButton width={80} height={24}
         action={{ type: "spell", spell: 635, unit: "player" }}>
         <Label text="Holy Light" align="CENTER" />
@@ -479,12 +479,12 @@ track; native API declarations and reads remain in wuira.
 ### Swing timers
 
 ```tsx
-import { UI, wuira } from "wuira";
+import { UI, Wuira } from "wuira";
 import { ProgressBar } from "wuira/ui";
 import { SwingTimer, SwingHand } from "wuira/datasources";
 
 const mainHand = new SwingTimer(SwingHand.MainHand);
-const view = wuira.Mount(<ProgressBar width={200} height={12} source={mainHand} />);
+const view = Wuira.Mount(<ProgressBar width={200} height={12} source={mainHand} />);
 
 // Other choices: SwingHand.OffHand and SwingHand.Ranged.
 // mainHand.Value: remaining seconds; Max.Value: duration; Percent.Value: remaining percent.
@@ -610,7 +610,7 @@ const view = (
     }} />
 );
 
-wuira.Mount(view);
+Wuira.Mount(view);
 ```
 
 ### Addon tooling
@@ -679,7 +679,7 @@ Alternatively, install globally with `npm install -g wuira`, then use `wuira cre
 
 ```tsx
 import "wuira/console-polyfill";
-import { UI, wuira } from "wuira";
+import { UI, Wuira } from "wuira";
 
 
 function App() {
@@ -687,14 +687,14 @@ function App() {
     return <></>;
 }
 
-wuira.Mount(App);
+Wuira.Mount(App);
 ```
 
 An empty fragment creates no native frame. Only empty fragments are currently supported; use a layout for multiple visual elements.
 
 `console.log/info/warn/error` use a global WoW console polyfill. Output goes to the local chat window, never to other players. The addon uses no Node.js runtime or stdin/stdout. `console.error` does not throw. Arguments are formatted with Lua `tostring`; objects are not deeply inspected. The CLI uses its own Node.js terminal console.
 
-Importing `wuira` installs the global console polyfill automatically. The shared TypeScript config loads its global declarations and uses Node16 module resolution for package exports; DOM typings are not required. `wuira.Mount` accepts a `Cell`, no value, or a function returning `Cell | void`, so addons without a visual tree can simply log and return.
+Importing `wuira` installs the global console polyfill automatically. The shared TypeScript config loads its global declarations and uses Node16 module resolution for package exports; DOM typings are not required. `Wuira.Mount` accepts a `Cell`, no value, or a function returning `Cell | void`, so addons without a visual tree can simply log and return.
 
 ## Build and distribution
 

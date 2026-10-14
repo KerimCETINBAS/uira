@@ -1,7 +1,7 @@
-import { wuira } from "wuira";
+import { Wuira } from "wuira";
 
 function App() {
     console.log("{{addonName}} loaded");
 }
 
-wuira.Mount(App);
+Wuira.Mount(App);
