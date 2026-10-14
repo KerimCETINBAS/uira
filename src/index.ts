@@ -2,6 +2,7 @@ import "./console-polyfill";
 export { wuira } from "./wuira";
 export type { CommandCallback } from "./platform/SlashCommands";
 export { AddonSettings } from "./platform/AddonSettings";
+export { Encoding } from "./platform/Encoding";
 export { Spells } from "./Spells";
 export { BlizzardUI } from "./platform/BlizzardUI";
 export { ActionBars } from "./platform/ActionBars";

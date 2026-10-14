@@ -30,14 +30,16 @@ interface wuiraNativeFrame {
     StopMovingOrSizing(): void;
     EnableKeyboard(enabled: boolean): void;
     SetPropagateKeyboardInput(propagate: boolean): void;
-    SetScript(script: "OnClick" | "OnDragStart" | "OnDragStop" | "OnEnter" | "OnLeave", handler: ((this: void, frame: wuiraNativeFrame) => void) | undefined): void;
+    SetScript(script: "OnClick" | "OnDragStart" | "OnDragStop" | "OnEnter" | "OnLeave" | "OnEscapePressed", handler: ((this: void, frame: wuiraNativeFrame) => void) | undefined): void;
     SetScript(script: "OnKeyDown", handler: ((this: void, frame: wuiraNativeFrame, key: string) => void) | undefined): void;
+    SetScript(script: "OnMouseWheel", handler: ((this: void, frame: wuiraNativeFrame, delta: number) => void) | undefined): void;
     GetName(): string | undefined;
     IsProtected?(): boolean;
     GetParent(): wuiraNativeFrame;
     GetNumPoints(): number;
     GetPoint(index: number): wuiraNativeReturns<[wuiraAnchor, wuiraNativeFrame, wuiraAnchor, number, number]>;
     GetScale(): number;
+    SetScale(scale: number): void;
     GetChildren(): wuiraNativeFrame[] & { readonly __tstlMultiReturn: unknown };
     IsMouseOver(): boolean;
     SetFrameStrata(strata: "BACKGROUND" | "LOW" | "MEDIUM" | "HIGH" | "DIALOG" | "FULLSCREEN" | "FULLSCREEN_DIALOG" | "TOOLTIP"): void;
@@ -175,3 +177,12 @@ declare const GetTotemInfo: ((this: void, slot: number) => wuiraNativeReturns<[
     number | undefined, number | undefined, number | undefined,
 ]>) | undefined;
 declare const GetTotemDuration: ((this: void, slot: number) => import("../datasources/TimerSource").NativeDuration) | undefined;
+
+declare const C_EncodingUtil: {
+    SerializeCBOR(this: void, value: unknown): string;
+    DeserializeCBOR(this: void, value: string): unknown;
+    CompressString(this: void, value: string): string | undefined;
+    DecompressString(this: void, value: string): string | undefined;
+    EncodeBase64(this: void, value: string): string | undefined;
+    DecodeBase64(this: void, value: string): string | undefined;
+} | undefined;

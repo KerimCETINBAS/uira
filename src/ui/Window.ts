@@ -9,6 +9,7 @@ export class Window {
     private content?: wuiraNativeFrame;
     private pendingClose = false;
     private disposed = false;
+    private moving = false;
 
     public constructor(options: WindowOptions) {
         if (!Number.isFinite(options.width) || !Number.isFinite(options.height)
@@ -41,9 +42,11 @@ export class Window {
         if (this.disposed) error("Window is disposed");
         if (this.Frame.IsProtected?.() && InCombatLockdown()) error("Window: update protected content outside combat");
         this.pendingClose = false;
-        if (this.content !== undefined) wuira.Unmount(this.content);
-        this.content = undefined;
-        this.content = wuira.Mount(view, undefined, this.Frame);
+        // Keep the current view usable if rendering or mounting its replacement fails.
+        const next = wuira.Mount(view, undefined, this.Frame);
+        const previous = this.content;
+        this.content = next;
+        if (previous !== undefined) wuira.Unmount(previous);
         this.Frame.SetPropagateKeyboardInput(true);
         this.Frame.EnableKeyboard(true);
         this.Frame.Show();
@@ -54,11 +57,11 @@ export class Window {
         handle.EnableMouse(true);
         handle.RegisterForDrag("LeftButton");
         handle.SetScript("OnDragStart", () => {
-            if (!InCombatLockdown()) this.Frame.StartMoving();
+            if (!InCombatLockdown()) { this.Frame.StartMoving(); this.moving = true; }
         });
-        handle.SetScript("OnDragStop", () => this.Frame.StopMovingOrSizing());
+        handle.SetScript("OnDragStop", () => this.StopMoving());
         return () => {
-            this.Frame.StopMovingOrSizing();
+            this.StopMoving();
             handle.RegisterForDrag();
             handle.SetScript("OnDragStart", undefined);
             handle.SetScript("OnDragStop", undefined);
@@ -68,7 +71,7 @@ export class Window {
     public Close(): void {
         if (this.Frame.IsProtected?.() && InCombatLockdown()) { this.pendingClose = true; return; }
         this.pendingClose = false;
-        this.Frame.StopMovingOrSizing();
+        this.StopMoving();
         this.Frame.EnableKeyboard(false);
         this.Frame.Hide();
         if (this.content !== undefined) wuira.Unmount(this.content);
@@ -83,5 +86,11 @@ export class Window {
         this.Frame.SetScript("OnEvent", undefined);
         this.Frame.SetScript("OnKeyDown", undefined);
         this.disposed = true;
+    }
+
+    private StopMoving(): void {
+        if (!this.moving) return;
+        this.Frame.StopMovingOrSizing();
+        this.moving = false;
     }
 }

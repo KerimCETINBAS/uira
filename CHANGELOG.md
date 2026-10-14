@@ -7,6 +7,22 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.1.9 — 2026-10-15
+
+### Added
+
+- Generic `Encoding.Encode` / `Decode` using native CBOR, compression and Base64,
+  with decode size checks. Import formats and schema validation stay in applications.
+- Native `ScrollHost` for clipped, mouse-wheel scrolling inside mounted Cells.
+- Native `TextInput` hosts for copy/paste and text entry inside mounted Cells,
+  including focus selection, Escape callbacks and cleanup.
+
+### Fixed
+
+- `TextInput` passes the required font flags to Forever's native EditBox API.
+- `Window.Open` retains its current content if a replacement fails to render or
+  mount. Header cleanup only stops a drag when the window is actually moving.
+
 ## 0.1.8 — 2026-10-14
 
 ### Added

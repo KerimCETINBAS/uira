@@ -166,6 +166,41 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         return instance
       end
       local factory = __wuiraModules.require("ui.primitives.jsx").UI.createElement
+      do
+        local nativeCreate = CreateFrame
+        CreateFrame = function(kind,name,parent,template)
+          if kind ~= "EditBox" then return nativeCreate(kind,name,parent,template) end
+          local frame = nativeCreate("Frame",name,parent)
+          function frame:SetAutoFocus(value) self.autoFocus=value end
+          function frame:SetMultiLine(value) self.multiLine=value end
+          function frame:SetFont(path,size,flags)
+            assert(type(path)=='string' and type(size)=='number' and type(flags)=='string','Forever EditBox:SetFont requires flags')
+            return true
+          end
+          function frame:SetTextInsets(...) self.insets={...} end
+          function frame:SetMaxBytes(value) self.maxBytes=value end
+          function frame:SetText(value) self.text=value end
+          function frame:GetText() return self.text end
+          function frame:HighlightText() self.selected=true end
+          function frame:SetFocus() self.focused=true end
+          function frame:ClearFocus() self.focused=false end
+          return frame
+        end
+        local TextInput = __wuiraModules.require("ui.TextInput").TextInput
+        local escaped = 0
+        local input = setmetatable({},TextInput.prototype)
+        input:____constructor(UIParent,{text="share string",maxBytes=100,onEscape=function() escaped=escaped+1 end})
+        assert(input.Value=="share string" and not input.Frame.autoFocus and input.Frame.maxBytes==100)
+        input:Focus(true)
+        assert(input.Frame.focused and input.Frame.selected)
+        input.Frame.scripts.OnEscapePressed(input.Frame)
+        assert(escaped==1 and not input.Frame.focused)
+        input:Dispose(); input:Dispose()
+        assert(not input.Frame.shown and input.Frame.scripts.OnEscapePressed==nil)
+        table.remove(frames)
+        table.remove(nativeFrames)
+        CreateFrame = nativeCreate
+      end
       local resources = __wuiraModules.require("datasources.Resources")
       local bgClass = __wuiraModules.require("ui.decorations.Background").Background
       local borderClass = __wuiraModules.require("ui.decorations.Border").Border
@@ -414,6 +449,41 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       local suppressedFrame = API.Mount(nil,suppressed)
       assert(#frames == first+1 and #suppressedFrame.textures == 0)
       API.Unmount(nil,suppressedFrame)
+      do
+        local Encoding = __wuiraModules.require("index").Encoding
+        assert(Encoding == __wuiraModules.require("platform.Encoding").Encoding)
+        assert(not pcall(function() Encoding:Encode({}) end), "missing native codec")
+        local payload = {spellId=635, enabled=true, rows={1,2}}
+        local steps,deserialized = {},0
+        C_EncodingUtil = {
+          SerializeCBOR=function(value) assert(value==payload);steps[#steps+1]="serialize";return "cbor" end,
+          CompressString=function(value) assert(value=="cbor");steps[#steps+1]="compress";return "packed" end,
+          EncodeBase64=function(value) assert(value=="packed");steps[#steps+1]="encode";return "encoded" end,
+          DecodeBase64=function(value) if value~="encoded" then return nil end;steps[#steps+1]="decode";return "packed" end,
+          DecompressString=function(value) assert(value=="packed");steps[#steps+1]="decompress";return "cbor" end,
+          DeserializeCBOR=function(value) assert(value=="cbor");steps[#steps+1]="deserialize";deserialized=deserialized+1;return payload end,
+        }
+        local encoded = Encoding:Encode(payload)
+        assert(encoded=="encoded" and Encoding:Decode(encoded)==payload)
+        assert(table.concat(steps,",")=="serialize,compress,encode,decode,decompress,deserialize")
+        assert(not pcall(function() Encoding:Decode("broken") end))
+        for _,limit in ipairs({0,-1,math.huge,0/0}) do assert(not pcall(function() Encoding:Decode(encoded,limit) end)) end
+        assert(not pcall(function() Encoding:Decode(string.rep("x",11),10) end))
+        local originalSecret=issecretvalue
+        issecretvalue=function(value) return value=="encoded" or originalSecret(value) end
+        assert(not pcall(function() Encoding:Decode(encoded) end), "secret strings rejected")
+        issecretvalue=originalSecret
+        C_EncodingUtil.DecompressString=function() return string.rep("x",11) end
+        assert(not pcall(function() Encoding:Decode(encoded,10) end) and deserialized==1, "oversized data not deserialized")
+        C_EncodingUtil.DecompressString=function() return nil end
+        assert(not pcall(function() Encoding:Decode(encoded) end))
+        C_EncodingUtil.CompressString=function() return nil end
+        assert(not pcall(function() Encoding:Encode(payload) end))
+        C_EncodingUtil.CompressString=function() return "packed" end
+        C_EncodingUtil.EncodeBase64=function() return nil end
+        assert(not pcall(function() Encoding:Encode(payload) end))
+        C_EncodingUtil=nil
+      end
       print("wuira_CELL_OK")
       local auraAPI = __wuiraModules.require("datasources.Auras")
       local helpful = {
@@ -1366,6 +1436,13 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
           assert(window.IsOpen and window.Frame.keyboard and header.parent==window.Frame)
           header.scripts.OnDragStart(header); assert(window.Frame.moving)
           header.scripts.OnDragStop(header); assert(not window.Frame.moving)
+          local originalHeader=header
+          assert(not pcall(function() window:Open(function() error('broken replacement') end) end))
+          assert(window.IsOpen and originalHeader.shown and window.Frame.keyboard,'failed render retains the current window')
+          assert(not pcall(function() window:Open(factory(nil,'cell',{onMount=function() error('broken mount') end})) end))
+          assert(window.IsOpen and originalHeader.shown,'failed mount retains the current content')
+          window:Open(factory(nil,'cell',{onMount=function(_,frame) header=frame end}))
+          assert(window.IsOpen and header.shown and not originalHeader.shown,'window recovers without reload')
           window.Frame.scripts.OnKeyDown(window.Frame,'A'); assert(window.Frame.propagate)
           window.Frame.scripts.OnKeyDown(window.Frame,'ESCAPE')
           assert(not window.IsOpen and not window.Frame.keyboard and not header.shown and header.scripts.OnDragStart==nil)

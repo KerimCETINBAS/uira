@@ -34,7 +34,7 @@ test("CLI creates and builds a standalone empty-JSX addon", async () => {
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(result.stderr, "");
     fs.appendFileSync(path.join(project, "src/index.tsx"), `
-import { UI } from "wuira";
+import { UI, Encoding } from "wuira";
 import { Cell, FlowLayout, ForEach, Window, ProgressBar, SecureButton, Button, FrameMover, KeybindCapture } from "wuira/ui";
 import { HP, Unit } from "wuira/datasources";
 import { SpellSource, KnownSpells } from "wuira/datasources";
@@ -44,6 +44,12 @@ import { Mana } from "wuira/datasources";
 const manaWithRegen = new Mana(Unit.Player).UseRegenTimer();
 if (manaWithRegen.RegenTimer === undefined) throw "Regen accessory missing";
 if (false) {
+    const encoded: string = Encoding.Encode({ spellId: 635, enabled: true });
+    const decoded: unknown = Encoding.Decode(encoded);
+    // @ts-expect-error Decoded data requires application validation.
+    decoded.spellId;
+    // @ts-expect-error Encoded input must be a string.
+    Encoding.Decode({ spellId: 635 });
     const stop = manaWithRegen.onChange(value => console.log(value.toFixed(0)));
     stop();
 }

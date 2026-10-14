@@ -14,6 +14,8 @@ export type { CellProps } from "./Cell";
 export { FlowLayout } from "./FlowLayout";
 export { ForEach } from "./ForEach";
 export { Window } from "./Window";
+export { TextInput } from "./TextInput";
+export { ScrollHost } from "./ScrollHost";
 export type { WindowOptions } from "./Window";
 export type { ForEachProps } from "./ForEach";
 export { GridLayout } from "./GridLayout";
