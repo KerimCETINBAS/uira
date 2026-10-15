@@ -53,6 +53,7 @@ interface wuiraNativeFrame {
     RegisterEvent(event: string): void;
     UnregisterAllEvents(): void;
     SetScript(script: "OnEvent", handler: ((this: void, frame: wuiraNativeFrame, event: string, unit?: string) => void) | undefined): void;
+    SetScript<TArgs extends unknown[]>(script: "OnEvent", handler: ((this: void, frame: wuiraNativeFrame, event: string, ...args: TArgs) => void) | undefined): void;
     SetScript(script: "OnUpdate", handler: ((this: void, frame: wuiraNativeFrame, elapsed: number) => void) | undefined): void;
     GetWidth(): number;
     GetHeight(): number;

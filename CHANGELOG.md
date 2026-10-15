@@ -7,6 +7,14 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.2 — 2026-10-15
+
+### Added
+
+- Event-driven EditModeLayouts source with native layout metadata, active layout,
+  availability status and disposable change subscriptions. Layout keys use native
+  type, interface style and name; indices are not persistent IDs.
+
 ### Fixed
 
 - Keep generated spell files in LF format on Windows checkouts so deterministic

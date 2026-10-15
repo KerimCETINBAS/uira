@@ -507,6 +507,23 @@ event listener when its owning feature ends. Support is capability-checked;
 actual timing still needs validation in Forever. The adapter follows the
 [Forever swing API definition](https://github.com/Gethe/wow-ui-source/blob/bd2470aed543f72697a044e989285b6c83e63f73/Interface/AddOns/Blizzard_APIDocumentationGenerated/SwingTimerDocumentation.lua).
 
+### Native Edit Mode layouts
+
+```ts
+import { EditModeLayouts } from "wuira/datasources";
+
+const layouts = new EditModeLayouts();
+console.log(layouts.Active?.name);
+const stop = layouts.onChange(snapshot => console.log(snapshot.active?.key));
+// On teardown: stop(); layouts.Dispose();
+```
+
+`Layouts` lists native indices, names, types and derived keys. `Value` is a detached
+snapshot; native events refresh it without polling. Check `Status` for availability.
+Forever exposes an index rather than a persistent UUID: `key` combines type,
+interface style and name, survives index shifts, and changes on rename. These keys
+describe local game layouts, not portable layout exports.
+
 ### Group members
 
 ```ts

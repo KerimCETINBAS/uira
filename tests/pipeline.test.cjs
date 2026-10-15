@@ -880,6 +880,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         C_SpellBook,C_Spell,Enum=oldBook,oldSpell,oldEnum
       end
       verifyKnownSpells()
+      ${fs.readFileSync(path.join(__dirname, "editmode-layouts.lua"), "utf8")}
       end
       PlayerFrame=CreateFrame("Frame",nil,UIParent)
       TargetFrame=CreateFrame("Frame",nil,UIParent)

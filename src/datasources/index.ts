@@ -1,4 +1,6 @@
 export { DataSource } from "./DataSource";
+export { EditModeLayouts } from "./EditModeLayouts";
+export type { EditModeLayout, EditModeLayoutSnapshot, EditModeLayoutsStatus } from "./EditModeLayouts";
 export { ProgressSource } from "./ProgressSource";
 export { HP, Mana, Unit, DataSources, HealthPrediction } from "./Resources";
 export { Aura, AuraSource, Buffs, Debuffs } from "./Auras";
