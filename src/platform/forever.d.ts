@@ -50,6 +50,8 @@ interface wuiraNativeFrame {
     SetFrameLevel(level: number): void;
     CreateFontString(name: undefined, layer: "OVERLAY"): wuiraNativeFontString;
     EnableMouse(enabled: boolean): void;
+    EnableMouseMotion(enabled: boolean): void;
+    IsMouseMotionEnabled(): boolean;
     RegisterEvent(event: string): void;
     UnregisterAllEvents(): void;
     SetScript(script: "OnEvent", handler: ((this: void, frame: wuiraNativeFrame, event: string, unit?: string) => void) | undefined): void;

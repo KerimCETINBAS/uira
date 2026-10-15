@@ -93,6 +93,8 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
           return text
         end
         function frame:EnableMouse(enabled) self.mouseEnabled = enabled end
+        function frame:EnableMouseMotion(enabled) self.mouseMotion=enabled;self.motionChanges=(self.motionChanges or 0)+1 end
+        function frame:IsMouseMotionEnabled() if self.mouseMotion~=nil then return self.mouseMotion end;return self.mouseEnabled==true end
         function frame:GetWidth() return self.width end
         function frame:GetHeight() return self.height end
         function frame:RegisterEvent(event) self.events = self.events or {}; self.events[event] = true end
@@ -149,7 +151,10 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         function frame:Hide() self.shown = false end
         function frame:SetParent(parent) self.parent = parent end
         function frame:GetParent() return self.parent end
-        function frame:HookScript(script, handler) assert(script == "OnShow"); self.onShowHook=handler end
+        function frame:HookScript(script, handler)
+          if script == "OnShow" then self.onShowHook=handler end
+          self.hooks=self.hooks or {}; self.hooks[script]=self.hooks[script] or {};table.insert(self.hooks[script],handler)
+        end
         function frame:ClearAllPoints() end
         function frame:SetAllPoints(parent) assert(parent == self.parent) end
         function frame:SetBackdrop(info) self.backdrop = info end
@@ -1298,6 +1303,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       local inert=API.Mount(nil,factory(nil,"secureButton",{width=10,height=10}))
       assert(inert.attributes.type1 == nil and inert.mouseEnabled)
       API.Unmount(nil,inert)
+      ${fs.readFileSync(path.join(__dirname, "tooltip.lua"), "utf8")}
       local lateVisible=true
       local host=API.Mount(nil,factory(nil,"cell",{width=40,height=40,visible=function() return lateVisible end}))
       local hostDriver=frames[#frames]

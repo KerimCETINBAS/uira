@@ -23,6 +23,8 @@ export { ProgressBar } from "./ProgressBar";
 export { Background } from "./decorations/Background";
 export { Border } from "./decorations/Border";
 export { Glow } from "./decorations/Glow";
+export { Tooltip } from "./decorations/Tooltip";
+export type { TooltipProps, TooltipAnchor, TooltipLine, NativeTooltip } from "./decorations/Tooltip";
 export { Label } from "./Label";
 export type { LabelProps } from "./Label";
 export { Icon } from "./Icon";

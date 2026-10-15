@@ -19,4 +19,5 @@ export function renderDecorations(item: RenderedCell, tree: MountedTree): void {
     attach(progress?.backdrop === false ? undefined
         : progress?.backdrop !== undefined ? new Border(progress.backdrop) : decorations?.border);
     attach(decorations?.glow);
+    attach(decorations?.tooltip);
 }

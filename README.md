@@ -610,6 +610,30 @@ not install event listeners or poll automatically. The current adapter requires
 in-game verification. Unit tokens refer to snapshot time and are not persistent
 caster identities. No Paladin-specific spell catalog or filtering is built in.
 
+### Native tooltips
+
+`Tooltip` attaches to any Cell through decorations. It forwards hover to the
+game's native tooltip API and creates no visual regions or update loop.
+
+```tsx
+import { Cell, Tooltip } from "wuira/ui";
+
+<Cell width={40} height={40} decorations={{
+    tooltip: new Tooltip({ text: "My tooltip", lines: [{ text: "Extra details" }] }),
+}} />;
+
+<Cell width={40} height={40} decorations={{
+    tooltip: new Tooltip({ show: tooltip => tooltip.SetSpellByID(635) }),
+}} />;
+```
+
+The same attachment works on SecureButton. Call SetItemByID, SetUnit, SetHyperlink
+or SetAction inside `show` for other native content. `text` may be a function
+evaluated on hover; `show` may return false to suppress display. Optional `target`
+selects another native tooltip, and `anchor` defaults to ANCHOR_RIGHT.
+Hover preserves click-through and existing scripts. Leave, hide and unmount close
+only a tooltip still owned by that Cell. Use one decoration instance per Cell.
+
 ### Visual styling
 
 <!-- Screenshot: a dark Cell with a thin colored border. -->

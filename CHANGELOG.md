@@ -7,6 +7,16 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.3 — 2026-10-15
+
+### Added
+
+- Tooltip attachment in Cell decorations, inherited by all visual components.
+  Route hover to native GameTooltip or another native tooltip with custom text,
+  extra lines or a callback using native spell, item, unit, hyperlink and action APIs.
+- Motion-only hover input preserves click-through behavior and existing scripts;
+  owned tooltips close on leave, hide and disposal without changing secure actions.
+
 ## 0.2.2 — 2026-10-15
 
 ### Added
