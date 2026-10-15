@@ -13,11 +13,12 @@ abstract class Resource extends ProgressSource {
     private eventFrame?: wuiraNativeFrame;
     private dispatching = false;
     private eventValue = 0;
+    private stopUnit?: () => void;
     protected constructor(
         current: () => number,
         maximum: () => number,
         percent: () => number,
-        private readonly unitToken: string,
+        private readonly unitReference: UnitSource,
         private readonly events: string[],
     ) {
         super({ current, min: () => 0, max: maximum, percent });
@@ -52,20 +53,25 @@ abstract class Resource extends ProgressSource {
         if (this.listeners.size === 1) {
             if (this.eventFrame === undefined) this.eventFrame = CreateFrame("Frame", undefined, UIParent);
             const frame = this.eventFrame;
-            frame.SetScript("OnEvent", (_frame, event, ...payload: unknown[]) => {
-                if (event !== "PLAYER_ENTERING_WORLD" && (issecretvalue(payload[0]) || payload[0] !== this.unitToken)) return;
+            const dispatch = (event: string, payload: unknown[]) => {
                 this.eventValue = super.GetValue();
                 this.dispatching = true;
                 try {
                     for (const callback of this.listeners) callback(event, payload, this.eventValue);
                 } finally { this.dispatching = false; }
+            };
+            frame.SetScript("OnEvent", (_frame, event, ...payload: unknown[]) => {
+                if (event !== "PLAYER_ENTERING_WORLD" && (issecretvalue(payload[0]) || payload[0] !== this.unitReference.Token)) return;
+                dispatch(event, payload);
             });
+            this.stopUnit = this.unitReference.onChange(() => dispatch("UNIT_IDENTITY_CHANGED", [this.unitReference.Token]));
             frame.RegisterEvent("PLAYER_ENTERING_WORLD");
             for (const event of this.events) frame.RegisterEvent(event);
         }
         return () => {
             this.listeners.delete(listener);
             if (this.listeners.size === 0) {
+                this.stopUnit?.(); this.stopUnit = undefined;
                 this.eventFrame?.UnregisterAllEvents();
                 this.eventFrame?.SetScript("OnEvent", undefined);
             }
@@ -136,7 +142,7 @@ export class HP extends Resource {
     public constructor(unit: UnitInput = Unit.Player) {
         const target = resolveUnit(unit);
         super(() => UnitHealth(target.Token), () => UnitHealthMax(target.Token),
-            () => UnitHealthPercent(target.Token, true, CurveConstants.ScaleTo100), target.Token, ["UNIT_HEALTH", "UNIT_MAXHEALTH"]);
+            () => UnitHealthPercent(target.Token, true, CurveConstants.ScaleTo100), target, ["UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_CONNECTION"]);
         this.target = target;
     }
 }
@@ -158,7 +164,7 @@ export class Mana extends Resource {
     public constructor(unit: UnitInput) {
         const target = resolveUnit(unit);
         super(() => UnitPower(target.Token, 0), () => UnitPowerMax(target.Token, 0),
-            () => UnitPowerPercent(target.Token, 0, true, CurveConstants.ScaleTo100), target.Token, ["UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER"]);
+            () => UnitPowerPercent(target.Token, 0, true, CurveConstants.ScaleTo100), target, ["UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_CONNECTION"]);
         this.target = target;
     }
 }

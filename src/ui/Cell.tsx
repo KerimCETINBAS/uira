@@ -10,6 +10,8 @@ export type Size = number | "inherit";
 export interface Cell extends Element {}
 
 export type CellProps = {
+    /** Stable sibling identity for keyed list reconciliation. */
+    key?: string | number;
     width: Size;
     height: Size;
     margin?: Spacing;

@@ -12,13 +12,13 @@ export interface UnitIdentity {
 }
 
 export class UnitPredicates {
-    public constructor(private readonly token: string) {}
+    public constructor(private readonly token: () => string) {}
     public get PC(): boolean | undefined {
-        const value = UnitIsPlayer(this.token);
+        const value = UnitIsPlayer(this.token());
         return issecretvalue(value) ? undefined : value;
     }
     public get Self(): boolean | undefined {
-        const value = UnitIsUnit(this.token, "player");
+        const value = UnitIsUnit(this.token(), "player");
         return issecretvalue(value) ? undefined : value;
     }
 }
@@ -27,9 +27,22 @@ export class UnitPredicates {
 export class UnitSource extends DataSource<UnitIdentity | undefined> {
     public readonly Is: UnitPredicates;
     private restricted = false;
-    public constructor(public readonly Token: string) {
+    private readonly listeners = new Set<() => void>();
+    public constructor(private token: string) {
         super(undefined);
-        this.Is = new UnitPredicates(Token);
+        this.Is = new UnitPredicates(() => this.Token);
+    }
+    public get Token(): string { return this.token; }
+    /** Keep source objects/subscriptions while a stable identity moves to another unit slot. */
+    public Retarget(token: string): void {
+        if (token === this.token) return;
+        if (InCombatLockdown()) error("UnitSource: retarget after combat so secure actions and displayed data stay aligned");
+        if (issecretvalue(token) || typeof token !== "string" || token.trim() === "") error("UnitSource: expected a public unit token");
+        this.token = token;
+        for (const listener of this.listeners) listener();
+    }
+    public onChange(listener: () => void): () => void {
+        this.listeners.add(listener); return () => { this.listeners.delete(listener); };
     }
     protected override HasSecretFields(): boolean { return this.restricted; }
     protected override GetValue(): UnitIdentity | undefined {

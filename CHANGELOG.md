@@ -7,6 +7,24 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.4 — 2026-10-15
+
+### Added
+
+- Observable keyed ForEach rendering. Stable keys retain native widgets and their
+  subscriptions across joins, leaves, reorder and metadata updates; only added or
+  removed records mount or dispose. Supports grouped layout and wrapping.
+- Native GroupRoster metadata with GUID identity, full-name/realm fallback, pet
+  ownership and raid subgroup membership. Retains the last readable roster if
+  native membership data becomes restricted.
+- Cell keys, event-driven GroupMembers subscriptions and shared UnitSource
+  retargeting. HP/Mana readers and event filters follow the existing unit reference.
+
+### Changed
+
+- Defer keyed structural updates and unit retargeting until combat ends, keeping
+  protected click targets aligned with displayed data.
+
 ## 0.2.3 — 2026-10-15
 
 ### Added

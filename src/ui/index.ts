@@ -17,7 +17,7 @@ export { Window } from "./Window";
 export { TextInput } from "./TextInput";
 export { ScrollHost } from "./ScrollHost";
 export type { WindowOptions } from "./Window";
-export type { ForEachProps } from "./ForEach";
+export type { ForEachProps, ForEachSource } from "./ForEach";
 export { GridLayout } from "./GridLayout";
 export { ProgressBar } from "./ProgressBar";
 export { Background } from "./decorations/Background";

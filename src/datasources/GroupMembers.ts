@@ -8,8 +8,25 @@ export type GroupScope = "auto" | "party" | "raid";
 /** Fresh roster tokens, including offline members. Tokens are not persistent identities. */
 export class GroupMembers extends DataSource<readonly string[]> {
     private restricted = false;
+    private readonly listeners = new Set<(units: readonly string[]) => void>();
+    private frame?: wuiraNativeFrame;
 
     public constructor(public readonly scope: GroupScope = "auto") { super([]); }
+    /** Roster/connection events, with one listener frame while observed. No polling. */
+    public onChange(listener: (units: readonly string[]) => void): () => void {
+        this.listeners.add(listener);
+        if (this.listeners.size === 1) {
+            this.frame ??= CreateFrame("Frame", undefined, UIParent);
+            for (const event of ["GROUP_ROSTER_UPDATE", "UNIT_PET", "UNIT_CONNECTION", "UNIT_NAME_UPDATE", "PLAYER_ENTERING_WORLD"]) this.frame.RegisterEvent(event);
+            this.frame.SetScript("OnEvent", () => {
+                const units = this.GetValue(); if (this.restricted) return;
+                for (const callback of this.listeners) callback(units);
+            });
+        }
+        return () => { this.listeners.delete(listener); if (this.listeners.size === 0) this.StopListening(); };
+    }
+    private StopListening(): void { this.frame?.UnregisterAllEvents(); this.frame?.SetScript("OnEvent", undefined); this.frame?.Hide(); }
+    public Dispose(): void { this.listeners.clear(); this.StopListening(); }
 
     protected override HasSecretFields(): boolean { return this.restricted; }
 

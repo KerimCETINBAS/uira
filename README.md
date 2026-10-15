@@ -270,9 +270,10 @@ function SealButtons() {
 
 The render function receives the item and its zero-based index. Use `ForEach`
 inside a layout for multiple siblings; Cell still accepts at most one expanded
-child. Nested loops are flattened in order. `ForEach` creates no subscriptions:
+child. Nested loops are flattened in order. Array inputs create no subscriptions:
 recreate the view from `known.onChange` when needed, outside combat for protected
-trees. Each filtered rank remains a separate entry.
+trees. Each filtered rank remains a separate entry. Observable list sources also
+support keyed updates, as shown below under Group members.
 
 All visual cells accept `condition={boolean}` or `condition={() => boolean}`.
 This controls visibility and retains the layout slot. It combines with datasource
@@ -542,10 +543,45 @@ const raid = new RaidMembers();
 `GroupMembers` returns `["player"]` while solo, `player` plus `partyN` tokens
 in a party, and `raidN` tokens in a raid. `PartyMembers` is empty outside a
 party; `RaidMembers` is empty outside a raid. The player is included once.
-Offline members are retained. Each `.Value` access reads the current roster;
-there is no automatic subscription, polling, or UI rerender. Read again when
-handling `GROUP_ROSTER_UPDATE`. Tokens may refer to different members after
-roster changes and should not be used as persistent identities.
+Offline members are retained. Each `.Value` access reads the current roster.
+`onChange` subscribes to roster, pet, connection and name events without polling;
+unsubscribe or call `Dispose()` when done. Tokens may refer to different members
+after roster changes and should not be used as persistent identities.
+
+`GroupRoster` adds GUID-based keys, full-name/realm fallback, pet ownership and
+raid subgroup metadata. Pass it directly to `ForEach` to retain mounted cells and
+their resource subscriptions while the roster changes:
+
+```tsx
+import { UI, Wuira } from "wuira";
+import { ForEach, ProgressBar, type Element } from "wuira/ui";
+import { GroupRoster, HP, UnitSource } from "wuira/datasources";
+
+const roster = new GroupRoster("party", { pets: true, includeSelfWhenSolo: true });
+const units = new Map<Element, UnitSource>();
+const view = (
+    <ForEach items={roster} key={member => member.key}
+        direction="vertical" wrapAfter={5} gap={4} lineGap={8}
+        onUpdate={(view, member) => units.get(view)!.Retarget(member.unit)}
+        onDispose={view => { units.delete(view); }}>
+        {member => {
+            const unit = new UnitSource(member.unit);
+            const view = <ProgressBar width={160} height={24} source={new HP(unit)} />;
+            units.set(view, unit);
+            return view;
+        }}
+    </ForEach>
+);
+const frame = Wuira.Mount(view)!;
+// On teardown: Wuira.Unmount(frame); roster.Dispose();
+```
+
+Observable inputs expose `Value` and `onChange`, and require unique, public keys.
+Only new keys call the child factory; removed keys unmount and call `onDispose`.
+Use `onUpdate` to update retained views when their unit token or metadata changes.
+Structural changes wait until combat ends. The observable `ForEach` owns its
+layout and sizes its native host; mount it as a root or reserve an explicit slot
+in its parent layout. `groupBy` can arrange raid subgroups in separate columns.
 
 ### Player class and specialization
 
@@ -567,6 +603,9 @@ specs.RequestInspect();
 These sources accept real players only; NPCs produce no data or inspect request.
 The same `UnitSource` can be passed to `Buffs`, `Debuffs`, `HP`, and `Mana`.
 Its `Value` contains the current token and GUID, rather than a cached identity.
+`Retarget(token)` changes a shared reference outside combat; bound HP/Mana widgets
+refresh without replacing their sources. `onChange` observes these explicit token
+changes, not every change to the native unit's identity.
 `Is.PC` and `Is.Self` return `undefined` when their native result is secret.
 String unit tokens are still supported as a convenience shorthand.
 Own specialization data is read directly. Other players require an explicit,

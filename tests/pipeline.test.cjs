@@ -1304,6 +1304,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(inert.attributes.type1 == nil and inert.mouseEnabled)
       API.Unmount(nil,inert)
       ${fs.readFileSync(path.join(__dirname, "tooltip.lua"), "utf8")}
+      ${fs.readFileSync(path.join(__dirname, "keyed-roster.lua"), "utf8")}
       local lateVisible=true
       local host=API.Mount(nil,factory(nil,"cell",{width=40,height=40,visible=function() return lateVisible end}))
       local hostDriver=frames[#frames]
