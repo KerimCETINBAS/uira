@@ -1,0 +1,56 @@
+name: Verify published package feeds
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published version to download and verify
+        required: true
+        type: string
+        default: '0.2.7'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: wuira
+            registry: https://registry.npmjs.org
+          - package: '@kerimcetinbas/wuira'
+            registry: https://npm.pkg.github.com
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: ${{ matrix.registry }}
+          scope: '@kerimcetinbas'
+      - name: Download and inspect published package
+        env:
+          PACKAGE_NAME: ${{ matrix.package }}
+          PACKAGE_VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ matrix.registry == 'https://npm.pkg.github.com' && secrets.GITHUB_TOKEN || '' }}
+        run: |
+          node -e 'if (!/^\d+\.\d+\.\d+(-[\w.-]+)?$/.test(process.env.PACKAGE_VERSION)) throw new Error("Invalid version");'
+          cd "$RUNNER_TEMP"
+          npm pack "$PACKAGE_NAME@$PACKAGE_VERSION" --ignore-scripts --json > packed.json
+          ARCHIVE=$(node -p 'require("./packed.json")[0].filename')
+          tar -xzf "$ARCHIVE"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package/package.json', 'utf8'));
+          if (pkg.name !== process.env.PACKAGE_NAME || pkg.version !== process.env.PACKAGE_VERSION) throw new Error('Unexpected package identity');
+          for (const file of ['lib/skins/Nameplates.lua', 'lib/skins/Nameplates.d.ts', 'docs/nameplates.md']) {
+            if (!fs.statSync('package/' + file).size) throw new Error('Missing package content: ' + file);
+          }
+          const api = fs.readFileSync('package/lib/skins/Nameplates.d.ts', 'utf8');
+          for (const member of ['Nameplates', 'Apply(', 'Replace(', 'Dispose(']) {
+            if (!api.includes(member)) throw new Error('Missing API: ' + member);
+          }
+          console.log('Downloaded and verified ' + pkg.name + '@' + pkg.version);
+          NODE
