@@ -50,16 +50,22 @@ export class WuiraApp {
         const tree = this.mountedTrees.get(frame);
         if (tree === undefined) return;
         if (this.Protect(frame, tree) && InCombatLockdown()) { tree.pendingUnmount = true; return; }
-        for (const dispose of tree.bindings) dispose();
-        for (const decoration of tree.decorations) decoration.dispose();
+        let failed = false;
+        let failure: unknown;
+        const attempt = (action: () => void) => {
+            try { action(); } catch (caught) { if (!failed) { failed = true; failure = caught; } }
+        };
+        for (const dispose of tree.bindings) attempt(dispose);
+        for (const decoration of tree.decorations) attempt(() => decoration.dispose());
         for (const child of tree.frames) {
-            child.UnregisterAllEvents();
-            child.SetScript("OnEvent", undefined);
-            child.SetScript("OnUpdate", undefined);
-            child.Hide();
+            attempt(() => child.UnregisterAllEvents());
+            attempt(() => child.SetScript("OnEvent", undefined));
+            attempt(() => child.SetScript("OnUpdate", undefined));
+            attempt(() => child.Hide());
         }
         for (const cell of tree.cells) this.mountedFrames.delete(cell.props);
         this.mountedTrees.delete(frame);
+        if (failed) throw failure;
     }
 
     private Protect(root: wuiraNativeFrame, tree: MountedTree): boolean {

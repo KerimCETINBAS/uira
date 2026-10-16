@@ -19,6 +19,8 @@ export { UI } from "./ui/primitives/jsx";
 export { HoverTracker } from "./ui/HoverTracker";
 export type { HoverTrackerOptions, HoverFrame } from "./ui/HoverTracker";
 export { MicroBar } from "./skins/MicroBar";
+export { Nameplates, NameplateRules, NameplateContext } from "./skins/Nameplates";
+export type { NameplateInfo, NameplateSelector, NameplateCustomize, NameplateRender, NativeNameplate, NativeNameplateVisual } from "./skins/Nameplates";
 export type { Element, Component } from "./ui/primitives/jsx";
 export type { Cell } from "./ui/Cell";
 export { Store, StoreRegistry } from "./store/index";

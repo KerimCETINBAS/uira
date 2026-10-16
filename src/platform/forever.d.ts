@@ -35,6 +35,8 @@ interface wuiraNativeFrame {
     SetScript(script: "OnMouseWheel", handler: ((this: void, frame: wuiraNativeFrame, delta: number) => void) | undefined): void;
     GetName(): string | undefined;
     IsProtected?(): boolean;
+    IsForbidden?(): boolean;
+    GetAlpha(): number;
     GetParent(): wuiraNativeFrame;
     GetNumPoints(): number;
     GetPoint(index: number): wuiraNativeReturns<[wuiraAnchor, wuiraNativeFrame, wuiraAnchor, number, number]>;
@@ -95,6 +97,7 @@ declare const UIParent: wuiraNativeFrame;
 declare const _G: Record<string, unknown>;
 declare const SlashCmdList: Record<string, (this: void, message: string) => void>;
 interface wuiraNativeStatusBar extends wuiraNativeFrame {
+    GetStatusBarColor(): wuiraNativeReturns<[number, number, number, number]>;
     GetStatusBarTexture(): wuiraNativeTexture;
     SetMinMaxValues(min: number, max: number): void;
     SetValue(value: number): void;

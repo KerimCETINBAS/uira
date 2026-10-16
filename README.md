@@ -76,6 +76,29 @@ Other sources include `AuraTimer`, `GlobalCooldown`, `CastTimer`, `SpellCooldown
 
 Supported action types: `spell`, `item`, `macro`, `action`, and `target`. Actions and units are static mount-time attributes. Protected trees cannot be mounted during combat.
 
+## Nameplates
+
+```tsx
+import { Nameplates, UI } from "wuira";
+import { HP } from "wuira/datasources";
+
+const plates = Nameplates
+    .Apply(p => p.GUID === configuredGUID, p => {
+        if (p.Native.healthBar) p.Size(p.Native.healthBar, 140, 12);
+    })
+    .Replace(() => true, p => (
+        <progress width={140} height={12} source={new HP(p.Unit)} />
+    ));
+
+// plates.Dispose();
+```
+
+The first matching rule wins across Apply and Replace; they do not stack.
+Each factory creates fresh JSX for its unit. Use `Nameplates.Create()` with
+`collection.forEach(...)` to register presets, and `Refresh()` after preset changes.
+See [nameplate lifecycle and cleanup](docs/nameplates.md). Secure nameplate controls
+require a separate lifecycle and are not supported by this visual API.
+
 ## Stores
 
 ```ts
@@ -118,7 +141,7 @@ For global installation, use `npm install -g wuira`. To test unpublished changes
 
 wuira is an early framework. It is not a complete UI replacement, an in-game visual editor, or a WeakAuras replacement. JSX describes widgets; there is no React runtime or automatic reactive rendering layer. Combat restrictions and secret-value rules still apply and cannot be bypassed by the framework.
 
-Current core includes Cells, flow and grid layouts, progress bars, decorations, health and mana sources, a local console polyfill, and project tooling. Not yet implemented: a complete WoW API surface, click-cast abstractions, nameplate adapters, and preset management.
+Current core includes Cells, layouts, progress bars, decorations, unit sources, native nameplate adapters, and project tooling. Not yet implemented: a complete WoW API surface, nameplate click-cast abstractions, and preset management. Nameplate lifecycle tests use a mock Lua runtime; real-client validation is still required.
 
 The target client is WoW Forever. Compatibility with Retail or other Classic clients is not promised without verification.
 

@@ -4,7 +4,7 @@
     "type": "git",
     "url": "git+https://github.com/KerimCETINBAS/wuira.git"
   },
-  "version": "0.2.6",
+  "version": "0.2.7",
   "author": {
     "name": "Kerim Cetinbas",
     "email": "a.cetinbas@icloud.com"
@@ -95,7 +95,8 @@
     "LICENSE",
     "data/icons/forever.json",
     "docs/icons.md",
-    "docs/source-converters.md"
+    "docs/source-converters.md",
+    "docs/nameplates.md"
   ],
   "engines": {
     "node": ">=22.13"

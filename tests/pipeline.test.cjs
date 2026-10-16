@@ -1681,6 +1681,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       MicroMenu=nil
       CreateFrame=originalCreateFrame
       end
+      ${fs.readFileSync(path.join(__dirname, "nameplates.lua"), "utf8")}
     `;
     const file = path.join(fixture, "verify.lua");
     fs.writeFileSync(file, script);

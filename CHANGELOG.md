@@ -7,6 +7,22 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.7 — 2026-10-16
+
+### Added
+
+- Generic `Nameplates.Apply` / `Replace` registration groups, with global first-match
+  precedence, fresh per-unit JSX factories, reversible native visual helpers,
+  event-driven pooled-frame lifecycle, explicit refresh, and independent disposal.
+  Forbidden/protected frames and secret identities are skipped; secure JSX is rejected.
+- Lua integration coverage for nameplate reuse, rule conflicts, rollback, native
+  restoration and HP subscription cleanup. These are mock tests, not in-game validation.
+
+### Fixed
+
+- Continue unmount cleanup after a binding or decoration disposer throws, so remaining
+  subscriptions and frames are released before the first error is reported.
+
 ## 0.2.6 — 2026-10-16
 
 ### Changed
