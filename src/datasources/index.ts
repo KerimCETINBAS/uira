@@ -1,4 +1,8 @@
 export { DataSource } from "./DataSource";
+export type { ReadResult } from "./DataSource";
+export { SourceConverter, CaseConverter } from "./SourceConverter";
+export type { ValueSource, CaseKey, SourceCase } from "./SourceConverter";
+export { MathConverter } from "./MathConverter";
 export { EditModeLayouts } from "./EditModeLayouts";
 export type { EditModeLayout, EditModeLayoutSnapshot, EditModeLayoutsStatus } from "./EditModeLayouts";
 export { ProgressSource } from "./ProgressSource";

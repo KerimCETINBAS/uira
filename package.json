@@ -1,6 +1,10 @@
 {
   "name": "wuira",
-  "version": "0.2.4",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KerimCETINBAS/wuira.git"
+  },
+  "version": "0.2.5",
   "author": {
     "name": "Kerim Cetinbas",
     "email": "a.cetinbas@icloud.com"
@@ -42,7 +46,11 @@
     },
     "./config/tsconfig.json": "./config/tsconfig.json",
     "./tools/wow-modules.mjs": "./tools/wow-modules.mjs",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./icons": {
+      "types": "./lib/icons/index.d.ts",
+      "default": "./lib/icons/index.lua"
+    }
   },
   "typesVersions": {
     "*": {
@@ -66,6 +74,9 @@
       ],
       "console-polyfill": [
         "lib/console-polyfill.d.ts"
+      ],
+      "icons": [
+        "lib/icons/index.d.ts"
       ]
     }
   },
@@ -81,7 +92,10 @@
     "tsconfig.lib.json",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "data/icons/forever.json",
+    "docs/icons.md",
+    "docs/source-converters.md"
   ],
   "engines": {
     "node": ">=22.13"
@@ -97,7 +111,9 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "spells:update": "node tools/update-spells.mjs",
     "spells:generate": "node tools/generate-spells.mjs",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "icons:update": "node tools/update-icons.mjs",
+    "icons:generate": "node tools/generate-icons.mjs"
   },
   "devDependencies": {
     "fengari-node-cli": "0.1.0"

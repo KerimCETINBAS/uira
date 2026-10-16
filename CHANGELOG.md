@@ -7,6 +7,26 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.5 — 2026-10-16
+
+### Added
+
+- `SourceConverter`, `CaseConverter` and `MathConverter` with checked reads,
+  shared event subscriptions, strict case matching and a bounded arithmetic
+  parser. Restricted values never reach conversion callbacks. ClassSource now
+  provides lazy native change subscriptions for unit identity and class data.
+
+- Generated `Icons` const enum and packaged icon catalog under `wuira/icons`,
+  using native texture FileDataIDs from the same pinned Forever client build as
+  the spell enums. Includes spell, active-spell and item icons with searchable
+  names and aliases, plus repeatable update and generation commands.
+
+### Fixed
+
+- Wait for the completed addon load before opening SavedVariables. The native
+  `IsAddOnLoaded` loading flag no longer causes stores to retain a temporary table
+  and lose changes on reload.
+
 ## 0.2.4 — 2026-10-15
 
 ### Added

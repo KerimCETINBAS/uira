@@ -25,6 +25,9 @@ export interface ClassInfo {
 
 export class ClassSource extends DataSource<ClassInfo | undefined> {
     private restricted = false;
+    private readonly listeners = new Set<(value: ClassInfo | undefined) => void>();
+    private events?: wuiraNativeFrame;
+    private stopUnit?: () => void;
     public readonly target: UnitSource;
     public constructor(unit: UnitInput) { super(undefined); this.target = resolveUnit(unit); }
     public get unit(): string { return this.target.Token; }
@@ -42,6 +45,23 @@ export class ClassSource extends DataSource<ClassInfo | undefined> {
         if (name === undefined || token === undefined || id === undefined) return undefined;
         return { name, token, id };
     }
+
+    public onChange(listener: (value: ClassInfo | undefined) => void): () => void {
+        this.listeners.add(listener);
+        if (this.listeners.size === 1) {
+            const refresh = () => { if (!this.IsSecret()) { const value = this.Value; if (this.CanEmit(value)) for (const callback of this.listeners) callback(value); } };
+            const events = CreateFrame("Frame", undefined, UIParent); this.events = events;
+            for (const event of ["UNIT_NAME_UPDATE", "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD"]) events.RegisterEvent(event);
+            events.SetScript("OnEvent", (_frame, event, unit) => { if (event !== "UNIT_NAME_UPDATE" || !issecretvalue(unit) && unit === this.unit) refresh(); });
+            this.stopUnit = this.target.onChange(refresh);
+        }
+        return () => { this.listeners.delete(listener); if (this.listeners.size === 0) this.StopListening(); };
+    }
+    private StopListening(): void {
+        this.stopUnit?.(); this.stopUnit = undefined;
+        this.events?.UnregisterAllEvents(); this.events?.SetScript("OnEvent", undefined); this.events?.Hide(); this.events = undefined;
+    }
+    public Dispose(): void { this.StopListening(); this.listeners.clear(); }
 }
 
 export interface SpecializationInfo {

@@ -1,3 +1,5 @@
+export type ReadResult<T> = { readonly readable: true; readonly value: T } | { readonly readable: false };
+
 /** A value-producing source. Secrecy describes data, not native frame protection. */
 export abstract class DataSource<T> {
     private conditions?: ((value: T) => boolean)[];
@@ -18,6 +20,12 @@ export abstract class DataSource<T> {
         const value = this.GetValue();
         this.AssertReadable(value);
         return compute(value);
+    }
+
+    /** One checked read, without exposing a restricted value or invoking its callback. */
+    public TryCompute<TResult>(compute: (value: T) => TResult): ReadResult<TResult> {
+        const value = this.GetValue();
+        return this.IsValueSecret(value) ? { readable: false } : { readable: true, value: compute(value) };
     }
 
     protected GetValue(): T { return this.value; }

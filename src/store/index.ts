@@ -1,5 +1,5 @@
 declare const _G: Record<string, unknown>;
-declare const C_AddOns: { IsAddOnLoaded?: (this: void, name: string) => boolean } | undefined;
+declare const C_AddOns: { IsAddOnLoaded?: (this: void, name: string) => wuiraNativeReturns<[boolean, boolean]> } | undefined;
 declare const string: { match(this: void, value: string, pattern: string): string | undefined };
 declare function print(this: void, message: string): void;
 
@@ -58,7 +58,12 @@ export class StoreRegistry {
     public constructor(private readonly options?: SavedStoreOptions) {
         if (options === undefined) return;
         if (string.match(options.variable, "^[%a_][%w_]*$") === undefined) throw "Invalid SavedVariables name";
-        if (C_AddOns?.IsAddOnLoaded?.(options.addon)) { this.Load(); return; }
+        // The first return value is also true while scripts are still loading.
+        // SavedVariables are ready only when the second return value is true.
+        if (C_AddOns?.IsAddOnLoaded !== undefined) {
+            const [, loaded] = C_AddOns.IsAddOnLoaded(options.addon);
+            if (loaded) { this.Load(); return; }
+        }
         this.listener = CreateFrame("Frame", undefined, UIParent);
         this.listener.RegisterEvent("ADDON_LOADED");
         this.listener.SetScript("OnEvent", (_frame, _event, addon) => {

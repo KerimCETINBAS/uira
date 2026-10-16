@@ -34,7 +34,9 @@ test("CLI creates and builds a standalone empty-JSX addon", async () => {
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(result.stderr, "");
     fs.appendFileSync(path.join(project, "src/index.tsx"), `
-import { UI, Encoding, wuira, WuiraApp, Store as RootStore, StoreRegistry as RootStoreRegistry } from "wuira";
+import { UI, Encoding, wuira, WuiraApp, Store as RootStore, StoreRegistry as RootStoreRegistry, Icons as RootIcons } from "wuira";
+import { Icons } from "wuira/icons";
+import { SourceConverter, CaseConverter, MathConverter, ClassSource } from "wuira/datasources";
 const currentApp: WuiraApp = Wuira.App;
 if (currentApp !== Wuira.App || wuira !== Wuira) throw "Application accessor must remain stable";
 import { PaladinSpells, MageSpells, RacialSpells, GeneralSpells, BindingActions } from "wuira/spells";
@@ -49,6 +51,16 @@ import { Mana } from "wuira/datasources";
 const manaWithRegen = new Mana(Unit.Player).UseRegenTimer();
 if (manaWithRegen.RegenTimer === undefined) throw "Regen accessory missing";
 if (false) {
+    const transformed = new MathConverter(hp, "2 * input");
+    const mapped = new CaseConverter(new SourceConverter(new ClassSource("player"), value => value?.token), [{ equals: "PALADIN", value: { r: 1, g: 0.5, b: 0.7 } }]);
+    const output: number = transformed.Value;
+    // @ts-expect-error Arithmetic converters require numeric source values.
+    new MathConverter(new ClassSource("player"), "input * 2");
+    mapped.Dispose(); transformed.Dispose();
+    const nativeTexture: number = Icons.BlessingOfFreedom_135968;
+    const rootTexture: number = RootIcons.BlessingOfFreedom_135968;
+    // @ts-expect-error Icon names are generated from the verified catalog.
+    Icons.NotARealForeverIcon;
     class MemorySettings extends RootStore { spellId = PaladinSpells.HolyLight; }
     const snapshot = new RootStoreRegistry().get(MemorySettings);
     const spellId: number = snapshot.spellId;

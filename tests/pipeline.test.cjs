@@ -577,6 +577,15 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(target.Is.PC == true and target.Is.Self == false and target.Value.guid == "A")
       local class = new(unitAPI.ClassSource,target)
       assert(class.Value.token == "PALADIN" and class.Value.id == 2)
+      do
+      local classChanges=0
+      local stopClass=class:onChange(function(_,value) assert(value.token=="PALADIN");classChanges=classChanges+1 end)
+      local classListener=frames[#frames]
+      classListener.onEvent(classListener,"UNIT_NAME_UPDATE","other");assert(classChanges==0)
+      classListener.onEvent(classListener,"GROUP_ROSTER_UPDATE");assert(classChanges==1)
+      target:Retarget("party1");assert(classChanges==2);target:Retarget("target");assert(classChanges==3)
+      stopClass();assert(classListener.onEvent==nil and next(classListener.events)==nil)
+      end
       local own = new(unitAPI.Specializations,"player")
       assert(#own.Value == 3 and own.Value[3].pointsSpent == 15)
       local specs = new(unitAPI.SpecSource,target)
@@ -660,13 +669,29 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       assert(notifications == 1)
       registry:set(Memory,function(_,draft) draft.Width=230; return draft end)
       assert(LumaTestDB.Memory == nil and registry:get(Other).Width == 99)
-      C_AddOns={IsAddOnLoaded=function() return true end}
+      C_AddOns={IsAddOnLoaded=function() return true,true end}
       local reloaded = new(storeAPI.StoreRegistry,options)
       assert(reloaded:get(Persisted).Width == 260 and reloaded:get(Memory).Width == 220)
       assert(reloaded:get(Persisted).bindings["679"] == "CTRL-K")
       local Collision = {Token="luma.settings",prototype=Memory.prototype}
       assert(not pcall(function() reloaded:get(Collision) end))
       registry:Dispose()
+      -- During addon script execution, loadedOrLoading is true but loaded is false.
+      C_AddOns={IsAddOnLoaded=function() return true,false end}
+      local earlyTable={}
+      LumaTestDB=earlyTable
+      local loadingRegistry=new(storeAPI.StoreRegistry,options)
+      local loadingReady=false
+      loadingRegistry:onReady(function() loadingReady=true end)
+      assert(not loadingRegistry.IsReady and not loadingReady)
+      LumaTestDB={["luma.settings"]={Width=321,nested={value=8},bindings={}}}
+      listener=frames[#frames]
+      C_AddOns.IsAddOnLoaded=function() return true,true end
+      listener.onEvent(listener,"ADDON_LOADED","LumaTest")
+      assert(loadingReady and loadingRegistry:get(Persisted).Width==321)
+      loadingRegistry:set(Persisted,function(_,state) state.Width=322;return state end)
+      assert(LumaTestDB["luma.settings"].Width==322 and next(earlyTable)==nil,'writes follow the actual SavedVariables table')
+      loadingRegistry:Dispose()
       local swingAPI = __wuiraModules.require("datasources.SwingTimer")
       local now = 10
       function GetTime() return now end
@@ -1176,7 +1201,7 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
         assert(hardware,"PickupAction requires user input")
         pickups=pickups+1; cursor=slots[slot]; slots[slot]=nil; emit("CURSOR_CHANGED")
       end
-      C_AddOns={IsAddOnLoaded=function() return true end}
+      C_AddOns={IsAddOnLoaded=function() return true,true end}
       local stopFirst=actionAPI.InstallEmptyMode(actionAPI,emptyOptions)
       emit("PLAYER_ENTERING_WORLD")
       assert(reloads == 0 and slots[1] and errors == 0) -- Events never mutate slots or reload.

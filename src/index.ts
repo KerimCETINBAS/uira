@@ -9,6 +9,7 @@ export {
     PriestSpells, ProfessionSpells, RacialSpells, RogueSpells, ShamanSpells,
     WarlockSpells, WarriorSpells, WorldSpells, BindingActions,
 } from "./spells/index";
+export { Icons } from "./icons/index";
 export { BlizzardUI } from "./platform/BlizzardUI";
 export { ActionBars } from "./platform/ActionBars";
 export type { ActionSlot, EmptyActionBarsOptions } from "./platform/ActionBars";

@@ -1,0 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
+import { iconEnumSource } from "./icon-data.mjs";
+const root = path.resolve(import.meta.dirname, "..");
+const catalog = JSON.parse(fs.readFileSync(path.join(root,"data/icons/forever.json"),"utf8"));
+const spells = JSON.parse(fs.readFileSync(path.join(root, "data/spells/forever.json"), "utf8"));
+if (catalog.build !== spells.build || catalog.product !== spells.product) throw new Error("Icon and spell builds must match");
+const output=path.join(root,"src/icons");fs.mkdirSync(output,{recursive:true});
+fs.writeFileSync(path.join(output, "index.ts"), iconEnumSource(catalog));
+console.log("Generated " + catalog.icons.length + " native icon IDs");
