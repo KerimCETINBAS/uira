@@ -88,23 +88,3 @@ export class SourceConverter<TInput, TOutput> extends DataSource<TOutput> {
     }
 }
 
-export type CaseKey = string | number | boolean;
-export interface SourceCase<T> { readonly equals: CaseKey; readonly value: T; }
-
-/** Strict equality, first matching case, then the optional default value. */
-export class CaseConverter<TInput, TOutput> extends SourceConverter<TInput, TOutput | undefined> {
-    public constructor(input: ValueSource<TInput>, cases: readonly SourceCase<TOutput>[], fallback?: TOutput) {
-        const entries = cases.map(entry => ({ ...entry }));
-        const seen = new Set<CaseKey>();
-        for (const entry of entries) {
-            const key = entry.equals;
-            if (issecretvalue(key) || !["string", "number", "boolean"].includes(typeof key) || typeof key === "number" && !Number.isFinite(key)) error("CaseConverter: invalid match value");
-            if (seen.has(key)) error("CaseConverter: duplicate match value");
-            seen.add(key);
-        }
-        super(input, value => {
-            for (const entry of entries) if (value === entry.equals as unknown) return entry.value;
-            return fallback;
-        });
-    }
-}

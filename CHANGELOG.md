@@ -7,6 +7,19 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.6 — 2026-10-16
+
+### Changed
+
+- Keep wuira source conversion callback-based. Case mappings and arithmetic
+  formula factories now belong to LumaUI's builder layer.
+
+### Removed
+
+- **Breaking:** Remove the `CaseConverter` and `MathConverter` APIs introduced in
+  0.2.5, including the expression parser. Use `new SourceConverter(source,
+  value => ...)` in wuira code; LumaUI owns its editable case/math definitions.
+
 ## 0.2.5 — 2026-10-16
 
 ### Added

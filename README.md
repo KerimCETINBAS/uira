@@ -30,7 +30,7 @@ wuira.Mount(App);
 - **Native widgets** — Cells mount to WoW frames; progress bars use the native StatusBar widget.
 - **Layout primitives** — Arrange children with `flow` and `grid`.
 - **Data sources** — HP, Mana, auras, cooldowns, casts, swings, group members, class/spec, spellbook.
-- **Source converters** — Compose checked value transformations, case mappings and arithmetic expressions. See [source converters](docs/source-converters.md).
+- **Source converters** — Transform checked values with typed callbacks. See [source converters](docs/source-converters.md).
 - **Slash commands** — Register commands with quoting and escaping support.
 - **Windows and settings** — `Window`, `AddonSettings`, `FrameMover`, `KeybindCapture`.
 - **Secure buttons** — Spell, item, macro, action, and target actions with `SecureButton`.
