@@ -7,6 +7,16 @@ with the release date and highlight breaking changes explicitly.
 
 ## Unreleased
 
+## 0.2.8 — 2026-10-17
+
+### Fixed
+
+- `UnitSource("target").onChange` invalidates on `PLAYER_TARGET_CHANGED`, including
+  combat and target removal, without reading secret identities or notifying other
+  unit sources. Event subscriptions stop with the last consumer.
+- Add `onTokenChange` for secure consumers that should only rewrite bindings after
+  an explicit `Retarget`, not when a stable target address points to another unit.
+
 ## 0.2.7 — 2026-10-16
 
 ### Added

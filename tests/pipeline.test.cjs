@@ -580,11 +580,26 @@ test("Cell positions use screen coordinates, parent offsets and explicit referen
       do
       local classChanges=0
       local stopClass=class:onChange(function(_,value) assert(value.token=="PALADIN");classChanges=classChanges+1 end)
-      local classListener=frames[#frames]
+      local classListener
+      for _,frame in ipairs(frames) do if frame.events.GROUP_ROSTER_UPDATE and frame.events.UNIT_NAME_UPDATE then classListener=frame end end
       classListener.onEvent(classListener,"UNIT_NAME_UPDATE","other");assert(classChanges==0)
       classListener.onEvent(classListener,"GROUP_ROSTER_UPDATE");assert(classChanges==1)
       target:Retarget("party1");assert(classChanges==2);target:Retarget("target");assert(classChanges==3)
       stopClass();assert(classListener.onEvent==nil and next(classListener.events)==nil)
+      end
+      do
+      local dynamic=new(unitSourceAPI.UnitSource,"target")
+      local fixed=new(unitSourceAPI.UnitSource,"player")
+      local changes,fixedChanges,tokenChanges=0,0,0
+      local stop=dynamic:onChange(function() changes=changes+1 end)
+      local stopFixed=fixed:onChange(function() fixedChanges=fixedChanges+1 end)
+      local stopToken=dynamic:onTokenChange(function() tokenChanges=tokenChanges+1 end)
+      emit("PLAYER_TARGET_CHANGED");assert(changes==1 and fixedChanges==0 and tokenChanges==0)
+      combat=true;emit("PLAYER_TARGET_CHANGED");assert(changes==2 and tokenChanges==0,'combat identity updates must not mutate secure unit bindings');combat=false
+      dynamic:Retarget("party1");assert(changes==3 and tokenChanges==1)
+      emit("PLAYER_TARGET_CHANGED");assert(changes==3 and fixedChanges==0,'retargeted non-target sources stop observing target changes')
+      dynamic:Retarget("target");assert(changes==4 and tokenChanges==2)
+      stop();stopFixed();stopToken();emit("PLAYER_TARGET_CHANGED");assert(changes==4)
       end
       local own = new(unitAPI.Specializations,"player")
       assert(#own.Value == 3 and own.Value[3].pointsSpent == 15)
